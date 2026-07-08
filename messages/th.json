@@ -1,0 +1,16 @@
+{
+  "Navigation": {
+    "dashboard": "Dashboard",
+    "companies": "บริษัท",
+    "plans": "แพ็กเกจ",
+    "templates": "เทมเพลต",
+    "documents": "เอกสาร",
+    "settings": "ตั้งค่า"
+  },
+  "Auth": {
+    "login": "เข้าสู่ระบบ",
+    "email": "อีเมล",
+    "password": "รหัสผ่าน",
+    "invalid_credentials": "อีเมลหรือรหัสผ่านไม่ถูกต้อง"
+  }
+}

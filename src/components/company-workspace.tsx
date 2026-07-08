@@ -1,0 +1,299 @@
+import {
+  Copy,
+  Download,
+  Eye,
+  FileText,
+  Filter,
+  LineChart,
+  Pencil,
+  Plus,
+  Save,
+  Search,
+  Send,
+  Trash2,
+} from "lucide-react";
+import { DocumentDesigner } from "./document-designer";
+
+export type CompanySection =
+  | "dashboard"
+  | "documents"
+  | "document-create"
+  | "document-detail"
+  | "templates"
+  | "designer"
+  | "fields"
+  | "business-partners"
+  | "employees"
+  | "departments"
+  | "approval-flows"
+  | "approvals"
+  | "document-number-settings"
+  | "reports"
+  | "settings-company"
+  | "settings-users";
+
+const documents = [
+  { id: "QT-2026-0718", name: "ใบเสนอราคาโครงการ POS", category: "บัญชีและการเงิน", type: "ใบเสนอราคา", status: "รออนุมัติ", creator: "คุณวราภรณ์", partner: "Blue Ocean Studio", created: "08 ก.ค. 2026", updated: "08 ก.ค. 2026" },
+  { id: "INV-2026-0421", name: "ใบแจ้งหนี้ Subscription", category: "บัญชีและการเงิน", type: "ใบแจ้งหนี้", status: "อนุมัติแล้ว", creator: "คุณอรทัย", partner: "Siam Retail Co., Ltd.", created: "07 ก.ค. 2026", updated: "08 ก.ค. 2026" },
+  { id: "TAX-2026-0114", name: "ใบกำกับภาษีเต็มรูป", category: "ภาษี", type: "ใบกำกับภาษี", status: "ชำระแล้ว", creator: "คุณวราภรณ์", partner: "North Star Logistics", created: "03 ก.ค. 2026", updated: "06 ก.ค. 2026" },
+  { id: "MOM-2026-0009", name: "รายงานประชุม Q3", category: "การดำเนินงาน", type: "รายงานการประชุม", status: "ร่าง", creator: "คุณกิตติ", partner: "-", created: "01 ก.ค. 2026", updated: "01 ก.ค. 2026" },
+];
+
+const templates = [
+  { name: "ใบเสนอราคา Standard", source: "Company", category: "บัญชีและการเงิน", type: "ใบเสนอราคา", status: "Active" },
+  { name: "ใบกำกับภาษี Global", source: "Global", category: "ภาษี", type: "ใบกำกับภาษี", status: "Active" },
+  { name: "สัญญาจ้างงาน", source: "Company", category: "บุคคล", type: "สัญญาจ้างงาน", status: "Inactive" },
+];
+
+const partners = [
+  { name: "Blue Ocean Studio", type: "CUSTOMER", taxId: "0105565005678", branch: "00000", email: "billing@blueocean.studio", phone: "089-222-4455", address: "12 ซอยอารีย์สัมพันธ์ กรุงเทพฯ", contact: "คุณพิชชา", contactPhone: "089-222-4455", docs: 24 },
+  { name: "North Star Logistics", type: "VENDOR", taxId: "0105564004321", branch: "00003", email: "ops@northstar.co.th", phone: "02-778-9090", address: "88 ถนนบางนา-ตราด", contact: "คุณอานนท์", contactPhone: "081-909-2233", docs: 12 },
+];
+
+const employees = [
+  { code: "EMP-001", name: "คุณวราภรณ์", email: "accountant@example.com", phone: "081-111-2233", position: "Senior Accountant", department: "บัญชี", salary: "฿58,000", start: "01 ม.ค. 2024", resign: "-", status: "ACTIVE" },
+  { code: "EMP-002", name: "คุณอรทัย", email: "finance@example.com", phone: "082-444-9988", position: "Finance Manager", department: "การเงิน", salary: "฿72,000", start: "15 มี.ค. 2023", resign: "-", status: "ACTIVE" },
+  { code: "EMP-003", name: "คุณกิตติ", email: "operation@example.com", phone: "083-555-1122", position: "Operation Lead", department: "ปฏิบัติการ", salary: "฿49,000", start: "01 มิ.ย. 2025", resign: "-", status: "ACTIVE" },
+];
+
+const departments = [
+  { name: "บัญชี", status: "ACTIVE", users: 6, employees: 12 },
+  { name: "การเงิน", status: "ACTIVE", users: 4, employees: 8 },
+  { name: "บุคคล", status: "ACTIVE", users: 3, employees: 5 },
+  { name: "ปฏิบัติการ", status: "ACTIVE", users: 9, employees: 38 },
+];
+
+const flows = [
+  { name: "อนุมัติใบแจ้งหนี้", documentType: "ใบแจ้งหนี้", status: "ACTIVE", steps: ["ACCOUNTANT", "FINANCE", "OWNER"] },
+  { name: "อนุมัติใบลา", documentType: "ใบลา", status: "ACTIVE", steps: ["HR", "ADMIN"] },
+];
+
+const numberSettings = [
+  { type: "ใบเสนอราคา", prefix: "QT", digits: "0001", running: 18, reset: "YEARLY", preview: "QT-2026-0018" },
+  { type: "ใบแจ้งหนี้", prefix: "INV", digits: "0001", running: 421, reset: "MONTHLY", preview: "INV-202607-0421" },
+  { type: "ใบกำกับภาษี", prefix: "TAX", digits: "0001", running: 114, reset: "YEARLY", preview: "TAX-2026-0114" },
+];
+
+const fieldTypes = ["TEXT", "NUMBER", "DATE", "DATETIME", "TEXTAREA", "RICH_TEXT", "IMAGE", "FILE", "TABLE", "SELECT", "CHECKBOX", "RADIO", "SIGNATURE", "BOOLEAN", "CURRENCY"];
+
+const sectionMeta: Record<CompanySection, { title: string; description: string }> = {
+  dashboard: { title: "Dashboard บริษัท", description: "ภาพรวมเอกสาร ลูกค้า พนักงาน งานรออนุมัติ และกราฟเอกสารของบริษัท" },
+  documents: { title: "รายการเอกสาร", description: "ค้นหา กรอง จัดการ ส่งอนุมัติ export และ archive เอกสารของบริษัท" },
+  "document-create": { title: "สร้างเอกสาร", description: "เลือกหมวดหมู่ ประเภท Template กรอก field preview แล้วบันทึกหรือส่งอนุมัติ" },
+  "document-detail": { title: "รายละเอียดเอกสาร", description: "ข้อมูลเอกสาร PDF ไฟล์แนบ ประวัติอนุมัติ และประวัติแก้ไข" },
+  templates: { title: "Template ของบริษัท", description: "Template บริษัทและ Template กลางที่นำมาใช้ได้ พร้อม Designer" },
+  designer: { title: "Document Designer", description: "เครื่องมือออกแบบเอกสารหลายหน้าแบบ drag & drop พร้อม properties และ page manager" },
+  fields: { title: "Fields ของ Template", description: "กำหนด field key, label, type, required, placeholder, default, validation และ options" },
+  "business-partners": { title: "ลูกค้า / คู่ค้า", description: "จัดการ CUSTOMER/VENDOR และเอกสารที่เกี่ยวข้อง" },
+  employees: { title: "พนักงาน", description: "จัดการข้อมูลพนักงาน แผนก สถานะ และเอกสารที่เกี่ยวข้อง" },
+  departments: { title: "แผนก", description: "จัดการแผนก ผู้ใช้งาน และพนักงานในแผนก" },
+  "approval-flows": { title: "ระบบอนุมัติเอกสาร", description: "กำหนด flow, document type, step, role และ specific approver" },
+  approvals: { title: "งานที่รออนุมัติ", description: "ดู preview อนุมัติ ไม่อนุมัติ ใส่หมายเหตุ และดูประวัติ" },
+  "document-number-settings": { title: "ตั้งค่าเลขเอกสาร", description: "กำหนด prefix, digits, running number, reset mode และ preview" },
+  reports: { title: "รายงาน", description: "รายงานเอกสารตามหมวด สถานะ ผู้สร้าง ลูกค้า ช่วงวันที่ และ export" },
+  "settings-company": { title: "ตั้งค่าบริษัท", description: "ข้อมูลบริษัท โลโก้ ที่อยู่ ภาษี ภาษา theme paper VAT และลายเซ็น" },
+  "settings-users": { title: "จัดการผู้ใช้บริษัท", description: "เพิ่ม แก้ไข ลบ เปลี่ยน role reset password และระงับผู้ใช้" },
+};
+
+function Status({ value }: { value: string }) {
+  const color = value === "ACTIVE" || value === "Active" || value === "อนุมัติแล้ว" || value === "ชำระแล้ว"
+    ? "bg-emerald-100 text-emerald-800"
+    : value === "รออนุมัติ"
+      ? "bg-amber-100 text-amber-800"
+      : "bg-slate-100 text-slate-700";
+  return <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${color}`}>{value}</span>;
+}
+
+function PageHeader({ section }: { section: CompanySection }) {
+  const meta = sectionMeta[section];
+  return (
+    <div className="border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        <p className="text-xs font-semibold uppercase tracking-wide text-teal-700">Company Workspace</p>
+        <h1 className="mt-1 text-3xl font-semibold text-slate-950 dark:text-white">{meta.title}</h1>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-400">{meta.description}</p>
+      </div>
+    </div>
+  );
+}
+
+function ActionButton({ label }: { label: string }) {
+  const Icon = label.includes("ลบ") ? Trash2 : label.includes("แก้") ? Pencil : label.includes("Duplicate") ? Copy : label.includes("Export") || label.includes("Download") ? Download : label.includes("Preview") || label.includes("รายละเอียด") ? Eye : label.includes("อนุมัติ") ? Send : Plus;
+  return <button className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><Icon className="size-3.5" />{label}</button>;
+}
+
+function Toolbar({ placeholder, filters = [], actions = [] }: { placeholder: string; filters?: string[]; actions?: string[] }) {
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-2">{actions.map((item) => <ActionButton key={item} label={item} />)}</div>
+      <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:flex-row">
+        <label className="relative block">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+          <input className="h-10 w-full rounded-md border border-slate-200 bg-white pl-9 pr-3 text-sm outline-none sm:w-80" placeholder={placeholder} />
+        </label>
+        {filters.map((filter) => <select key={filter} className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700"><option>{filter}</option></select>)}
+        <button className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700"><Filter className="size-4" />Filter</button>
+      </div>
+    </div>
+  );
+}
+
+function DocumentTable() {
+  return (
+    <table className="w-full min-w-[900px] text-left text-sm">
+      <thead className="text-xs uppercase text-slate-500"><tr>{["เลขเอกสาร", "ชื่อเอกสาร", "หมวดหมู่", "ประเภท", "สถานะ", "ผู้สร้าง", "วันที่", "จัดการ"].map((h) => <th key={h} className="py-3 pr-4 font-semibold">{h}</th>)}</tr></thead>
+      <tbody className="divide-y divide-slate-100">
+        {documents.map((doc) => (
+          <tr key={doc.id}>
+            <td className="py-4 pr-4 font-semibold text-slate-950">{doc.id}</td>
+            <td className="py-4 pr-4 text-slate-700">{doc.name}</td>
+            <td className="py-4 pr-4 text-slate-600">{doc.category}</td>
+            <td className="py-4 pr-4 text-slate-600">{doc.type}</td>
+            <td className="py-4 pr-4"><Status value={doc.status} /></td>
+            <td className="py-4 pr-4 text-slate-600">{doc.creator}</td>
+            <td className="py-4 pr-4 text-slate-600">{doc.created}</td>
+            <td className="py-4"><div className="flex flex-wrap gap-1.5">{["แก้ไข", "Duplicate", "Preview", "Export PDF", "ส่งอนุมัติ", "Archive"].map((a) => <ActionButton key={a} label={a} />)}</div></td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function Dashboard() {
+  const stats = [
+    ["เอกสารทั้งหมด", "1,248"], ["ฉบับร่าง", "82"], ["รออนุมัติ", "36"], ["อนุมัติแล้ว", "904"], ["ลูกค้า", "186"], ["พนักงาน", "64"],
+  ];
+  return (
+    <div className="space-y-5">
+      <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">{stats.map(([label, value]) => <div key={label} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"><p className="text-xs text-slate-500">{label}</p><p className="mt-2 text-2xl font-semibold text-slate-950">{value}</p></div>)}</div>
+      <div className="grid gap-5 lg:grid-cols-2">
+        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm"><h2 className="font-semibold">กราฟจำนวนเอกสารรายเดือน</h2><div className="mt-4 flex h-48 items-end gap-3">{[45, 62, 58, 74, 88, 96, 82].map((h, i) => <div key={i} className="flex-1 rounded-t bg-teal-500" style={{ height: `${h}%` }} />)}</div></div>
+        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm"><h2 className="font-semibold">กราฟแยกตามหมวดหมู่เอกสาร</h2><div className="mt-4 space-y-3">{["บัญชีและการเงิน", "ภาษี", "บุคคล", "การดำเนินงาน", "จดทะเบียน"].map((name, i) => <div key={name}><div className="flex justify-between text-sm"><span>{name}</span><span>{[42, 26, 14, 12, 6][i]}%</span></div><div className="mt-1 h-2 rounded bg-slate-100"><div className="h-2 rounded bg-teal-500" style={{ width: `${[42, 26, 14, 12, 6][i]}%` }} /></div></div>)}</div></div>
+      </div>
+      <div className="grid gap-5 lg:grid-cols-2"><div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm"><h2 className="font-semibold">เอกสารล่าสุด</h2><div className="mt-3 overflow-x-auto"><DocumentTable /></div></div><Approvals compact /></div>
+    </div>
+  );
+}
+
+function CreateDocument() {
+  const steps = ["เลือกหมวดหมู่", "เลือกประเภทเอกสาร", "เลือก Template", "กรอกข้อมูล", "Preview", "Save Draft", "ส่งอนุมัติ", "Export PDF"];
+  return (
+    <div className="grid gap-5 lg:grid-cols-[1fr_380px]">
+      <div className="space-y-4">{steps.map((step, i) => <div key={step} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"><div className="flex items-center gap-3"><span className="grid size-8 place-items-center rounded-full bg-teal-600 text-sm font-semibold text-white">{i + 1}</span><h2 className="font-semibold text-slate-950">{step}</h2></div><div className="mt-3 grid gap-2 sm:grid-cols-3"><input className="h-10 rounded-md border border-slate-200 px-3 text-sm" placeholder={`${step}...`} /><button className="h-10 rounded-md border border-slate-200 text-sm">เลือก</button><button className="h-10 rounded-md bg-slate-950 text-sm text-white">ถัดไป</button></div></div>)}</div>
+      <DocumentPreview />
+    </div>
+  );
+}
+
+function DocumentPreview() {
+  return <aside className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm"><h2 className="font-semibold text-slate-950">Preview เอกสาร</h2><div className="mt-4 rounded-md bg-slate-100 p-4"><div className="min-h-[460px] rounded bg-white p-6 shadow"><p className="text-xl font-bold">ใบเสนอราคา</p><p className="mt-2 text-sm text-slate-500">QT-2026-0718</p><div className="mt-8 h-20 rounded border border-dashed border-slate-300" /><div className="mt-4 h-32 rounded border border-slate-200 bg-slate-50" /><p className="mt-8 text-right text-lg font-semibold">฿128,500</p></div></div></aside>;
+}
+
+function DocumentDetail() {
+  const doc = documents[0];
+  return (
+    <div className="grid gap-5 lg:grid-cols-[1fr_380px]">
+      <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap gap-2">{["แก้ไข", "ส่งอนุมัติ", "Export PDF", "Download", "ลบ"].map((a) => <ActionButton key={a} label={a} />)}</div>
+        <dl className="mt-5 grid gap-4 sm:grid-cols-2">{Object.entries({ "เลขเอกสาร": doc.id, "ชื่อเอกสาร": doc.name, "หมวดหมู่": doc.category, "ประเภท": doc.type, "สถานะ": doc.status, "ผู้สร้าง": doc.creator, "วันที่สร้าง": doc.created, "แก้ไขล่าสุด": doc.updated, "ไฟล์ PDF": `${doc.id}.pdf`, "ไฟล์แนบ": "contract.pdf, receipt.png" }).map(([k, v]) => <div key={k}><dt className="text-xs text-slate-500">{k}</dt><dd className="mt-1 font-medium text-slate-950">{v}</dd></div>)}</dl>
+        <div className="mt-6 grid gap-4 sm:grid-cols-2"><Timeline title="ประวัติการอนุมัติ" items={["ACCOUNTANT approved", "FINANCE pending"]} /><Timeline title="ประวัติการแก้ไข" items={["สร้างเอกสาร", "แก้ไขยอดรวม", "แนบไฟล์ PDF"]} /></div>
+      </div>
+      <DocumentPreview />
+    </div>
+  );
+}
+
+function Timeline({ title, items }: { title: string; items: string[] }) {
+  return <div className="rounded-md border border-slate-200 p-4"><h3 className="font-semibold">{title}</h3><div className="mt-3 space-y-2">{items.map((item) => <p key={item} className="text-sm text-slate-600">• {item}</p>)}</div></div>;
+}
+
+function Templates() {
+  return <div className="grid gap-4 md:grid-cols-3">{templates.map((t) => <div key={t.name} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm"><LayoutIcon /><h2 className="mt-3 font-semibold">{t.name}</h2><p className="text-sm text-slate-500">{t.source} · {t.category} · {t.type}</p><div className="mt-3"><Status value={t.status} /></div><div className="mt-4 flex flex-wrap gap-1.5">{["แก้ไข", "ลบ", "Duplicate", "Preview", "Designer"].map((a) => <ActionButton key={a} label={a} />)}</div></div>)}</div>;
+}
+
+function LayoutIcon() { return <FileText className="size-5 text-teal-700" />; }
+
+function Designer() { return <DocumentDesigner />; }
+
+/*
+  return (
+    <div className="grid min-h-[760px] gap-4 lg:grid-cols-[240px_1fr_300px]">
+      <aside className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"><h2 className="font-semibold">Elements</h2><div className="mt-3 grid gap-2">{elementTypes.map((el) => <button key={el.name} className="flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm"><el.icon className="size-4" />{el.name}</button>)}</div></aside>
+      <section className="rounded-lg border border-slate-200 bg-slate-100 p-4 shadow-sm"><div className="mb-3 flex flex-wrap gap-2">{[Undo2, Redo2, ZoomIn, ZoomOut, Save, FileDown, Upload, FileJson].map((Icon, i) => <button key={i} className="grid size-9 place-items-center rounded-md border border-slate-200 bg-white"><Icon className="size-4" /></button>)}</div><div className="mx-auto min-h-[640px] max-w-[794px] border border-slate-300 bg-white p-10 shadow-lg" style={{ backgroundImage: "linear-gradient(#e2e8f0 1px, transparent 1px), linear-gradient(90deg, #e2e8f0 1px, transparent 1px)", backgroundSize: "24px 24px" }}><div className="rounded border border-dashed border-teal-400 p-4"><p className="text-2xl font-bold">ใบเสนอราคา</p><p className="mt-2 text-sm">Dynamic Field: {"{{document_number}}"}</p></div><div className="mt-8 h-32 rounded border border-slate-300 bg-slate-50" /></div><div className="mt-4 flex gap-2 overflow-x-auto">{["Page 1", "Page 2", "Page 3"].map((p) => <div key={p} className="w-28 shrink-0 rounded border border-slate-200 bg-white p-3 text-center text-xs">{p}<div className="mt-2 flex justify-center gap-1"><Copy className="size-3" /><Trash2 className="size-3" /></div></div>)}</div></section>
+      <aside className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"><h2 className="font-semibold">Properties</h2><div className="mt-3 space-y-2">{["ข้อความ", "Font Size", "Font Weight", "Font Family", "สีตัวอักษร", "สีพื้นหลัง", "Border", "Padding", "Margin", "Align", "Width / Height", "X / Y Position", "Dynamic Field Key"].map((p) => <label key={p} className="block text-xs text-slate-500">{p}<input className="mt-1 h-9 w-full rounded-md border border-slate-200 px-2 text-sm" /></label>)}</div><div className="mt-4 flex gap-2"><ActionButton label="ลบ Element" /><ActionButton label="Duplicate Element" /></div></aside>
+    </div>
+  );
+}
+
+*/
+
+function Fields() {
+  const rows = fieldTypes.slice(0, 8).map((type, i) => ({ key: `field_${i + 1}`, label: `${type} Field`, type, required: i % 2 === 0 ? "Yes" : "No", placeholder: `กรอก ${type}`, defaultValue: "-", validation: "optional", options: type === "SELECT" ? "A,B,C" : "-" }));
+  return <DataTable headers={["Field Key", "Label", "Type", "Required", "Placeholder", "Default", "Validation", "Options"]} rows={rows.map(Object.values)} actions={["เพิ่ม Field", "แก้ไข Field", "ลบ Field", "เรียงลำดับ Field"]} />;
+}
+
+function BusinessPartners() {
+  return <DataTable headers={["ชื่อ", "ประเภท", "Tax ID", "สาขา", "อีเมล", "เบอร์โทร", "ที่อยู่", "ผู้ติดต่อ", "เอกสาร"]} rows={partners.map((p) => [p.name, p.type, p.taxId, p.branch, p.email, p.phone, p.address, `${p.contact} ${p.contactPhone}`, p.docs])} actions={["เพิ่มลูกค้า", "แก้ไขลูกค้า", "ลบลูกค้า", "ดูเอกสารที่เกี่ยวข้อง"]} />;
+}
+
+function Employees() {
+  return <DataTable headers={["รหัส", "ชื่อ", "อีเมล", "เบอร์โทร", "ตำแหน่ง", "แผนก", "เงินเดือน", "เริ่มงาน", "ลาออก", "สถานะ"]} rows={employees.map(Object.values)} actions={["เพิ่มพนักงาน", "แก้ไขพนักงาน", "ลบพนักงาน", "ดูเอกสารที่เกี่ยวข้อง"]} />;
+}
+
+function Departments() {
+  return <DataTable headers={["แผนก", "สถานะ", "ผู้ใช้งาน", "พนักงาน"]} rows={departments.map((d) => [d.name, d.status, d.users, d.employees])} actions={["เพิ่มแผนก", "แก้ไขแผนก", "ลบแผนก", "เปิด/ปิดแผนก", "ดูผู้ใช้งาน", "ดูพนักงาน"]} />;
+}
+
+function ApprovalFlows() {
+  return <div className="grid gap-4 md:grid-cols-2">{flows.map((flow) => <div key={flow.name} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm"><h2 className="font-semibold">{flow.name}</h2><p className="mt-1 text-sm text-slate-500">Document Type: {flow.documentType}</p><div className="mt-3"><Status value={flow.status} /></div><div className="mt-4 flex items-center gap-2">{flow.steps.map((step, i) => <span key={step} className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold">Step {i + 1}: {step}</span>)}</div><div className="mt-4 flex flex-wrap gap-1.5">{["เพิ่ม Flow", "แก้ไข Flow", "ลบ Flow", "เพิ่ม Step", "ลบ Step", "เรียงลำดับ Step"].map((a) => <ActionButton key={a} label={a} />)}</div></div>)}</div>;
+}
+
+function Approvals({ compact = false }: { compact?: boolean }) {
+  return <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm"><h2 className="font-semibold">งานที่รออนุมัติ</h2><div className="mt-3 space-y-3">{documents.filter((d) => d.status === "รออนุมัติ").map((doc) => <div key={doc.id} className="rounded-md border border-slate-200 p-3"><p className="font-semibold">{doc.id} · {doc.name}</p><p className="text-sm text-slate-500">{doc.creator} · {doc.created}</p>{!compact && <div className="mt-3 flex flex-wrap gap-1.5">{["รายละเอียด", "Preview", "อนุมัติ", "ไม่อนุมัติ", "ใส่หมายเหตุ", "ประวัติอนุมัติ"].map((a) => <ActionButton key={a} label={a} />)}</div>}</div>)}</div></div>;
+}
+
+function NumberSettings() {
+  return <DataTable headers={["ประเภทเอกสาร", "Prefix", "จำนวนหลัก", "Running Number", "Reset Mode", "Preview"]} rows={numberSettings.map(Object.values)} actions={["แก้ไข", "Preview เลขเอกสาร"]} />;
+}
+
+function Reports() {
+  return <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{["จำนวนเอกสาร", "ตามหมวดหมู่", "ตามสถานะ", "ตามผู้สร้าง", "ตามลูกค้า", "ตามช่วงวันที่"].map((r) => <div key={r} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm"><LineChart className="size-5 text-teal-700" /><h2 className="mt-3 font-semibold">รายงานเอกสาร{r}</h2><p className="mt-1 text-sm text-slate-500">Export Excel / PDF</p><div className="mt-4 flex gap-2"><ActionButton label="Export Excel" /><ActionButton label="Export PDF" /></div></div>)}</div>;
+}
+
+function SettingsCompany() {
+  const fields = ["ชื่อบริษัท", "โลโก้", "ที่อยู่", "เลขประจำตัวผู้เสียภาษี", "ภาษา", "Theme", "Default Paper Size", "Default VAT", "ลายเซ็นบริษัท"];
+  return <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm"><div className="grid gap-4 md:grid-cols-2">{fields.map((f) => <label key={f} className="block text-sm font-medium text-slate-700">{f}<input className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm" placeholder={`แก้ไข${f}`} /></label>)}</div><button className="mt-5 inline-flex h-10 items-center gap-2 rounded-md bg-teal-600 px-4 text-sm font-semibold text-white"><Save className="size-4" />บันทึก</button></div>;
+}
+
+function DataTable({ headers, rows, actions }: { headers: string[]; rows: (string | number)[][]; actions: string[] }) {
+  return <div className="space-y-4"><div className="flex flex-wrap gap-2">{actions.map((a) => <ActionButton key={a} label={a} />)}</div><div className="overflow-x-auto rounded-lg border border-slate-200 bg-white p-4 shadow-sm"><table className="w-full min-w-[900px] text-left text-sm"><thead className="text-xs uppercase text-slate-500"><tr>{headers.map((h) => <th key={h} className="py-3 pr-4 font-semibold">{h}</th>)}<th className="py-3 font-semibold">จัดการ</th></tr></thead><tbody className="divide-y divide-slate-100">{rows.map((row, i) => <tr key={i}>{row.map((cell, j) => <td key={j} className="py-4 pr-4 text-slate-700">{cell}</td>)}<td className="py-4"><div className="flex gap-1.5"><ActionButton label="แก้ไข" /><ActionButton label="ลบ" /></div></td></tr>)}</tbody></table></div></div>;
+}
+
+export function CompanyWorkspace({ section }: { section: CompanySection }) {
+  const meta = sectionMeta[section];
+  return (
+    <div className="min-h-full bg-[#f6f8fb] text-slate-950 dark:bg-slate-950 dark:text-slate-100">
+      <PageHeader section={section} />
+      <main className="mx-auto max-w-7xl space-y-5 px-4 py-6 sm:px-6 lg:px-8">
+        {section === "dashboard" && <Dashboard />}
+        {section === "documents" && <><Toolbar placeholder="ค้นหาเลขเอกสารหรือชื่อเอกสาร" filters={["หมวดหมู่", "ประเภทเอกสาร", "สถานะ", "วันที่"]} actions={["เพิ่มเอกสาร", "แก้ไข", "ลบ", "Duplicate", "Preview", "Export PDF", "Download PDF", "ส่งอนุมัติ", "ยกเลิก", "Archive"]} /><div className="overflow-x-auto rounded-lg border border-slate-200 bg-white p-4 shadow-sm"><DocumentTable /></div></>}
+        {section === "document-create" && <CreateDocument />}
+        {section === "document-detail" && <DocumentDetail />}
+        {section === "templates" && <><Toolbar placeholder="ค้นหา Template" filters={["Company/Global", "สถานะ"]} actions={["เพิ่ม Template", "แก้ไข", "ลบ", "Duplicate", "Preview", "Active/Inactive", "Designer"]} /><Templates /></>}
+        {section === "designer" && <Designer />}
+        {section === "fields" && <Fields />}
+        {section === "business-partners" && <><Toolbar placeholder="ค้นหาลูกค้า / คู่ค้า" filters={["CUSTOMER / VENDOR"]} actions={[]} /><BusinessPartners /></>}
+        {section === "employees" && <><Toolbar placeholder="ค้นหาพนักงาน" filters={["แผนก", "สถานะ"]} actions={[]} /><Employees /></>}
+        {section === "departments" && <Departments />}
+        {section === "approval-flows" && <ApprovalFlows />}
+        {section === "approvals" && <Approvals />}
+        {section === "document-number-settings" && <NumberSettings />}
+        {section === "reports" && <Reports />}
+        {section === "settings-company" && <SettingsCompany />}
+        {section === "settings-users" && <DataTable headers={["ชื่อ", "อีเมล", "Role", "สถานะ"]} rows={[["Company Owner", "owner@example.com", "OWNER", "ACTIVE"], ["Accountant", "accountant@example.com", "ACCOUNTANT", "ACTIVE"], ["Viewer", "viewer@example.com", "VIEWER", "SUSPENDED"]]} actions={["เพิ่มผู้ใช้", "แก้ไขผู้ใช้", "ลบผู้ใช้", "เปลี่ยน Role", "Reset Password", "ระงับผู้ใช้", "เปิดใช้งานผู้ใช้"]} />}
+        <div className="sr-only">{meta.title}</div>
+      </main>
+    </div>
+  );
+}

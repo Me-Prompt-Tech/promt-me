@@ -1,0 +1,1372 @@
+สร้างโปรเจ็กระบบ SaaS สำหรับออกแบบรายงานและเอกสารองค์กร โดยให้บริษัทหลายบริษัทเข้ามาใช้งานระบบได้ แต่ละบริษัทมีข้อมูลแยกจากกันด้วย companyId ส่วนเจ้าของระบบเป็นแอดมินกลางที่สามารถจัดการบริษัท ผู้ใช้ แพ็กเกจ หมวดหมู่เอกสาร เทมเพลตกลาง และตรวจสอบการใช้งานระบบได้
+
+ใช้เทคโนโลยีหลักดังนี้
+
+* Next.js App Router
+* TypeScript
+* Tailwind CSS
+* shadcn/ui
+* Prisma ORM
+* MongoDB
+* NextAuth หรือระบบ JWT Auth
+* React Hook Form
+* Zod Validation
+* Zustand สำหรับ global state
+* รองรับ Dark Mode / Light Mode
+* รองรับ Responsive Layout ทั้ง Desktop, Tablet และ Mobile
+
+## 1. ภาพรวมของระบบ
+
+ระบบนี้คือแพลตฟอร์มสำหรับสร้าง ออกแบบ จัดเก็บ และส่งออกเอกสารของบริษัท เช่น ใบเสนอราคา ใบแจ้งหนี้ ใบกำกับภาษี สัญญาจ้างงาน รายงานประชุม และเอกสารอื่น ๆ
+
+ระบบต้องเป็น Multi-tenant SaaS โดยมีผู้ใช้งาน 2 กลุ่มใหญ่
+
+### 1.1 System Admin
+
+System Admin คือเจ้าของระบบหรือทีมแอดมินกลาง สามารถจัดการระบบทั้งหมดได้ เช่น
+
+* จัดการบริษัทที่มาใช้ระบบ
+* จัดการผู้ใช้ของแต่ละบริษัท
+* จัดการแพ็กเกจการใช้งาน
+* จัดการหมวดหมู่เอกสาร
+* จัดการประเภทเอกสาร
+* จัดการเทมเพลตกลาง
+* ดูประวัติการใช้งานระบบ
+* เปิด/ปิดการใช้งานบริษัท
+* ดู Dashboard ภาพรวมของระบบ
+
+### 1.2 Company User
+
+Company User คือผู้ใช้งานของบริษัทที่สมัครใช้ระบบ โดยแต่ละบริษัทจะเห็นเฉพาะข้อมูลของตัวเองเท่านั้น
+
+Role ของ Company User ประกอบด้วย
+
+* OWNER เจ้าของบริษัท
+* ADMIN แอดมินบริษัท
+* ACCOUNTANT ฝ่ายบัญชี
+* FINANCE ฝ่ายการเงิน
+* HR ฝ่ายบุคคล
+* OPERATION ฝ่ายปฏิบัติการ
+* STAFF พนักงานทั่วไป
+* VIEWER ผู้ดูข้อมูลอย่างเดียว
+
+## 2. หมวดหมู่เอกสารหลัก
+
+ระบบต้องมีหมวดหมู่เอกสารเริ่มต้น 5 หมวด ได้แก่
+
+### 2.1 เอกสารจดทะเบียน
+
+ตัวอย่างเอกสาร
+
+* หนังสือรับรองบริษัท
+* ใบทะเบียนพาณิชย์
+* ภ.พ.20
+* หนังสือบริคณห์สนธิ
+* บอจ.5
+* เอกสารเปลี่ยนแปลงกรรมการ
+* เอกสารเปลี่ยนแปลงที่อยู่บริษัท
+
+### 2.2 เอกสารด้านบัญชีและการเงิน
+
+ตัวอย่างเอกสาร
+
+* ใบเสนอราคา
+* ใบแจ้งหนี้
+* ใบเสร็จรับเงิน
+* ใบวางบิล
+* ใบสำคัญรับ
+* ใบสำคัญจ่าย
+* รายงานรายรับรายจ่าย
+* รายงานลูกหนี้
+* รายงานเจ้าหนี้
+
+### 2.3 เอกสารภาษี
+
+ตัวอย่างเอกสาร
+
+* ใบกำกับภาษี
+* ใบกำกับภาษีอย่างย่อ
+* ใบเพิ่มหนี้
+* ใบลดหนี้
+* ภ.ง.ด.1
+* ภ.ง.ด.3
+* ภ.ง.ด.53
+* ภ.พ.30
+* รายงานภาษีซื้อ
+* รายงานภาษีขาย
+
+### 2.4 เอกสารบุคคล
+
+ตัวอย่างเอกสาร
+
+* สัญญาจ้างงาน
+* ใบสมัครงาน
+* ใบลา
+* หนังสือรับรองเงินเดือน
+* หนังสือเตือนพนักงาน
+* ประวัติพนักงาน
+* แบบประเมินพนักงาน
+* เอกสารปรับเงินเดือน
+
+### 2.5 เอกสารการดำเนินงาน
+
+ตัวอย่างเอกสาร
+
+* รายงานการประชุม
+* ใบสั่งงาน
+* ใบตรวจงาน
+* Checklist งาน
+* รายงานประจำวัน
+* รายงานปัญหา
+* รายงานความคืบหน้างาน
+* แบบฟอร์มตรวจรับงาน
+
+## 3. โครงสร้างหน้าระบบฝั่ง System Admin
+
+สร้าง Layout ฝั่ง Admin ให้มี Sidebar, Header, Breadcrumb, Search, Notification, Profile Menu และปุ่มเปลี่ยน Dark Mode / Light Mode
+
+### 3.1 หน้า Dashboard ระบบกลาง
+
+แสดงข้อมูลภาพรวม เช่น
+
+* จำนวนบริษัททั้งหมด
+* จำนวนบริษัทที่ Active
+* จำนวนบริษัทที่ Suspended
+* จำนวนผู้ใช้ทั้งหมด
+* จำนวนเอกสารที่ถูกสร้างทั้งหมด
+* จำนวน Template ทั้งหมด
+* กราฟจำนวนเอกสารรายเดือน
+* ตารางบริษัทที่ใช้งานล่าสุด
+* ตาราง Activity Log ล่าสุด
+
+### 3.2 หน้าจัดการบริษัท
+
+Path ตัวอย่าง: `/admin/companies`
+
+ต้องมีความสามารถ
+
+* แสดงรายการบริษัททั้งหมด
+* ค้นหาบริษัท
+* Filter ตามสถานะ ACTIVE, SUSPENDED, CANCELLED
+* เพิ่มบริษัท
+* แก้ไขบริษัท
+* ลบบริษัท
+* เปิด/ปิดการใช้งานบริษัท
+* ดูรายละเอียดบริษัท
+* ดูผู้ใช้ภายในบริษัท
+* ดูจำนวนเอกสารของบริษัท
+* ดูแพ็กเกจที่บริษัทใช้งาน
+
+ข้อมูลบริษัทที่ต้องมี
+
+* ชื่อบริษัท
+* ชื่อนิติบุคคล
+* เลขประจำตัวผู้เสียภาษี
+* รหัสสาขา
+* อีเมล
+* เบอร์โทร
+* ที่อยู่
+* โลโก้บริษัท
+* สถานะบริษัท
+* แพ็กเกจที่ใช้งาน
+
+### 3.3 หน้าจัดการผู้ใช้บริษัท
+
+Path ตัวอย่าง: `/admin/company-users`
+
+ต้องมีความสามารถ
+
+* ดูผู้ใช้จากทุกบริษัท
+* ค้นหาตามชื่อ อีเมล บริษัท
+* Filter ตาม Role
+* Filter ตามสถานะ
+* เพิ่มผู้ใช้ให้บริษัท
+* แก้ไขผู้ใช้
+* Reset Password
+* ระงับการใช้งาน
+* ลบผู้ใช้
+
+### 3.4 หน้าจัดการแพ็กเกจ
+
+Path ตัวอย่าง: `/admin/plans`
+
+ต้องมีความสามารถ
+
+* เพิ่มแพ็กเกจ
+* แก้ไขแพ็กเกจ
+* ลบแพ็กเกจ
+* เปิด/ปิดแพ็กเกจ
+* กำหนดราคา
+* กำหนดจำนวนผู้ใช้สูงสุด
+* กำหนดจำนวนเอกสารสูงสุด
+* กำหนดพื้นที่เก็บไฟล์สูงสุด
+* กำหนด Feature ที่ใช้ได้
+
+ตัวอย่างแพ็กเกจ
+
+* Free
+* Starter
+* Professional
+* Business
+* Enterprise
+
+### 3.5 หน้าจัดการหมวดหมู่เอกสาร
+
+Path ตัวอย่าง: `/admin/document-categories`
+
+ต้องมีความสามารถ
+
+* แสดงหมวดหมู่เอกสาร
+* เพิ่มหมวดหมู่
+* แก้ไขหมวดหมู่
+* ลบหมวดหมู่
+* เปิด/ปิดหมวดหมู่
+* เรียงลำดับหมวดหมู่
+* กำหนด slug
+* กำหนด icon
+
+หมวดหมู่เริ่มต้นต้องมี 5 หมวด
+
+* เอกสารจดทะเบียน
+* เอกสารด้านบัญชีและการเงิน
+* เอกสารภาษี
+* เอกสารบุคคล
+* เอกสารการดำเนินงาน
+
+### 3.6 หน้าจัดการประเภทเอกสาร
+
+Path ตัวอย่าง: `/admin/document-types`
+
+ต้องมีความสามารถ
+
+* แสดงประเภทเอกสารทั้งหมด
+* ค้นหาประเภทเอกสาร
+* Filter ตามหมวดหมู่
+* เพิ่มประเภทเอกสาร
+* แก้ไขประเภทเอกสาร
+* ลบประเภทเอกสาร
+* เปิด/ปิดประเภทเอกสาร
+* เรียงลำดับประเภทเอกสาร
+
+ตัวอย่างประเภทเอกสาร
+
+* ใบเสนอราคา
+* ใบแจ้งหนี้
+* ใบเสร็จรับเงิน
+* ใบกำกับภาษี
+* สัญญาจ้างงาน
+* ใบลา
+* รายงานการประชุม
+* Checklist งาน
+
+### 3.7 หน้าจัดการ Template กลาง
+
+Path ตัวอย่าง: `/admin/templates`
+
+ต้องมีความสามารถ
+
+* แสดง Template กลางทั้งหมด
+* เพิ่ม Template
+* แก้ไข Template
+* ลบ Template
+* เปิด/ปิด Template
+* Duplicate Template
+* Preview Template
+* กำหนดว่า Template นี้เป็น Global Template
+* กำหนดหมวดหมู่เอกสาร
+* กำหนดประเภทเอกสาร
+* เข้าใช้งานหน้า Document Designer
+
+### 3.8 หน้า Audit Log ระบบ
+
+Path ตัวอย่าง: `/admin/audit-logs`
+
+ต้องมีความสามารถ
+
+* ดูประวัติการใช้งานระบบ
+* ค้นหาจากชื่อผู้ใช้
+* Filter ตามบริษัท
+* Filter ตาม Action
+* Filter ตามวันที่
+* ดู IP Address
+* ดู User Agent
+* ดูรายละเอียด Action
+
+## 4. โครงสร้างหน้าระบบฝั่งบริษัท
+
+สร้าง Layout ฝั่ง Company ให้มี Sidebar, Header, Breadcrumb, Search, Notification, Company Switcher ถ้าผู้ใช้มีหลายบริษัท และปุ่มเปลี่ยน Dark Mode / Light Mode
+
+### 4.1 หน้า Dashboard บริษัท
+
+Path ตัวอย่าง: `/dashboard`
+
+แสดงข้อมูลภาพรวมของบริษัท เช่น
+
+* จำนวนเอกสารทั้งหมด
+* จำนวนเอกสารฉบับร่าง
+* จำนวนเอกสารรออนุมัติ
+* จำนวนเอกสารอนุมัติแล้ว
+* จำนวนลูกค้า
+* จำนวนพนักงาน
+* เอกสารล่าสุด
+* งานที่รออนุมัติ
+* กราฟจำนวนเอกสารรายเดือน
+* กราฟแยกตามหมวดหมู่เอกสาร
+
+### 4.2 หน้าสร้างเอกสาร
+
+Path ตัวอย่าง: `/documents/create`
+
+ขั้นตอนการสร้างเอกสาร
+
+1. เลือกหมวดหมู่เอกสาร
+2. เลือกประเภทเอกสาร
+3. เลือก Template
+4. กรอกข้อมูลตาม Field ของ Template
+5. Preview เอกสาร
+6. Save Draft
+7. ส่งอนุมัติ
+8. Export PDF
+
+### 4.3 หน้ารายการเอกสาร
+
+Path ตัวอย่าง: `/documents`
+
+ต้องมีความสามารถ
+
+* แสดงเอกสารทั้งหมดของบริษัท
+* ค้นหาด้วยเลขเอกสารหรือชื่อเอกสาร
+* Filter ตามหมวดหมู่
+* Filter ตามประเภทเอกสาร
+* Filter ตามสถานะ
+* Filter ตามวันที่
+* เพิ่มเอกสาร
+* แก้ไขเอกสาร
+* ลบเอกสาร
+* Duplicate เอกสาร
+* Preview เอกสาร
+* Export PDF
+* Download PDF
+* ส่งอนุมัติ
+* ยกเลิกเอกสาร
+* Archive เอกสาร
+
+### 4.4 หน้ารายละเอียดเอกสาร
+
+Path ตัวอย่าง: `/documents/[id]`
+
+ต้องแสดงข้อมูล
+
+* เลขเอกสาร
+* ชื่อเอกสาร
+* หมวดหมู่
+* ประเภทเอกสาร
+* สถานะ
+* ผู้สร้าง
+* วันที่สร้าง
+* วันที่แก้ไขล่าสุด
+* ไฟล์ PDF
+* ไฟล์แนบ
+* ประวัติการอนุมัติ
+* ประวัติการแก้ไข
+* ปุ่มแก้ไข
+* ปุ่มส่งอนุมัติ
+* ปุ่ม Export PDF
+* ปุ่ม Download
+* ปุ่มลบ
+
+### 4.5 หน้า Template ของบริษัท
+
+Path ตัวอย่าง: `/templates`
+
+ต้องมีความสามารถ
+
+* แสดง Template ของบริษัท
+* แสดง Template กลางที่สามารถนำมาใช้ได้
+* เพิ่ม Template
+* แก้ไข Template
+* ลบ Template
+* Duplicate Template
+* Preview Template
+* ตั้งค่า Template เป็น Active/Inactive
+* เข้าใช้งานหน้า Document Designer
+
+### 4.6 หน้า Document Designer
+
+Path ตัวอย่าง: `/templates/[id]/designer`
+
+หน้านี้เป็นหัวใจหลักของระบบ ต้องทำเป็นเครื่องมือออกแบบเอกสารแบบหลายหน้า
+
+ความสามารถหลัก
+
+* ออกแบบเอกสารแบบ Drag & Drop
+* รองรับกระดาษ A4, A5, Letter, Legal
+* รองรับแนวตั้งและแนวนอน
+* เพิ่มหน้าเอกสารได้
+* แก้ไขหน้าเอกสารได้
+* ลบหน้าเอกสารได้
+* Duplicate หน้าเอกสารได้
+* เรียงลำดับหน้าเอกสารได้
+* ตั้งชื่อหน้าแต่ละหน้าได้
+* Zoom in / Zoom out
+* Preview แบบเต็มหน้า
+* Save Template
+* Auto Save
+* Undo / Redo
+* Export เป็น PDF
+* Import Template JSON
+* Export Template JSON
+
+โครงสร้างด้านซ้ายของ Designer
+
+* Panel รายการ Elements
+* Text
+* Heading
+* Paragraph
+* Image
+* Logo
+* Table
+* Line
+* Box
+* Signature
+* Date
+* Page Number
+* Checkbox
+* QR Code
+* Barcode
+* Dynamic Field
+
+โครงสร้างตรงกลางของ Designer
+
+* Canvas กระดาษเอกสาร
+* แสดงหน้าเอกสารทีละหน้า
+* มีขอบกระดาษ
+* มี Grid สำหรับช่วยจัดตำแหน่ง
+* สามารถลาก Element ลงกระดาษได้
+* สามารถเลือก Element แล้วปรับขนาดได้
+* สามารถเลื่อนตำแหน่งได้
+
+โครงสร้างด้านขวาของ Designer
+
+* Properties Panel
+* แก้ไขข้อความ
+* แก้ไข Font Size
+* แก้ไข Font Weight
+* แก้ไข Font Family
+* แก้ไขสีตัวอักษร
+* แก้ไขสีพื้นหลัง
+* แก้ไข Border
+* แก้ไข Padding
+* แก้ไข Margin
+* แก้ไข Align
+* แก้ไข Width / Height
+* แก้ไข X / Y Position
+* แก้ไข Dynamic Field Key
+* ลบ Element
+* Duplicate Element
+
+โครงสร้างด้านล่างหรือด้านข้างของ Designer สำหรับจัดการหน้า
+
+* แสดง Page Thumbnail
+* ปุ่มเพิ่มหน้า
+* ปุ่มลบหน้า
+* ปุ่มแก้ไขชื่อหน้า
+* ปุ่ม Duplicate หน้า
+* ปุ่มเลื่อนหน้าขึ้น/ลง
+* แสดงเลขหน้า เช่น Page 1, Page 2, Page 3
+
+ข้อมูล Layout ของ Template ให้เก็บเป็น JSON เช่น
+
+{
+"paper": {
+"size": "A4",
+"orientation": "PORTRAIT",
+"width": 794,
+"height": 1123
+},
+"pages": [
+{
+"id": "page_1",
+"name": "หน้าแรก",
+"order": 1,
+"elements": [
+{
+"id": "element_1",
+"type": "TEXT",
+"x": 40,
+"y": 40,
+"width": 300,
+"height": 40,
+"content": "ใบเสนอราคา",
+"style": {
+"fontSize": 24,
+"fontWeight": "bold",
+"color": "#000000",
+"textAlign": "left"
+}
+}
+]
+}
+]
+}
+
+### 4.7 หน้า Fields ของ Template
+
+Path ตัวอย่าง: `/templates/[id]/fields`
+
+ต้องมีความสามารถ
+
+* เพิ่ม Field
+* แก้ไข Field
+* ลบ Field
+* เรียงลำดับ Field
+* กำหนด Field Key
+* กำหนด Label
+* กำหนด Type
+* กำหนด Required
+* กำหนด Placeholder
+* กำหนด Default Value
+* กำหนด Validation
+* กำหนด Options สำหรับ Select, Radio, Checkbox
+
+Field Type ที่ต้องรองรับ
+
+* TEXT
+* NUMBER
+* DATE
+* DATETIME
+* TEXTAREA
+* RICH_TEXT
+* IMAGE
+* FILE
+* TABLE
+* SELECT
+* CHECKBOX
+* RADIO
+* SIGNATURE
+* BOOLEAN
+* CURRENCY
+
+### 4.8 หน้าลูกค้า / คู่ค้า
+
+Path ตัวอย่าง: `/business-partners`
+
+ต้องมีความสามารถ
+
+* แสดงลูกค้าและคู่ค้า
+* เพิ่มลูกค้า
+* แก้ไขลูกค้า
+* ลบลูกค้า
+* ค้นหาลูกค้า
+* Filter ตามประเภท CUSTOMER / VENDOR
+* ดูเอกสารที่เกี่ยวข้องกับลูกค้ารายนั้น
+
+ข้อมูลลูกค้า
+
+* ชื่อ
+* เลขประจำตัวผู้เสียภาษี
+* รหัสสาขา
+* อีเมล
+* เบอร์โทร
+* ที่อยู่
+* ชื่อผู้ติดต่อ
+* เบอร์ผู้ติดต่อ
+
+### 4.9 หน้าพนักงาน
+
+Path ตัวอย่าง: `/employees`
+
+ต้องมีความสามารถ
+
+* แสดงพนักงานทั้งหมด
+* เพิ่มพนักงาน
+* แก้ไขพนักงาน
+* ลบพนักงาน
+* ค้นหาพนักงาน
+* Filter ตามแผนก
+* Filter ตามสถานะ
+* ดูเอกสารที่เกี่ยวข้องกับพนักงาน
+
+ข้อมูลพนักงาน
+
+* รหัสพนักงาน
+* ชื่อ
+* อีเมล
+* เบอร์โทร
+* ตำแหน่ง
+* แผนก
+* เงินเดือน
+* วันที่เริ่มงาน
+* วันที่ลาออก
+* สถานะ
+
+### 4.10 หน้าแผนก
+
+Path ตัวอย่าง: `/departments`
+
+ต้องมีความสามารถ
+
+* แสดงแผนก
+* เพิ่มแผนก
+* แก้ไขแผนก
+* ลบแผนก
+* เปิด/ปิดแผนก
+* ดูผู้ใช้งานในแผนก
+* ดูพนักงานในแผนก
+
+### 4.11 หน้าระบบอนุมัติเอกสาร
+
+Path ตัวอย่าง: `/approval-flows`
+
+ต้องมีความสามารถ
+
+* แสดง Flow การอนุมัติ
+* เพิ่ม Flow
+* แก้ไข Flow
+* ลบ Flow
+* เปิด/ปิด Flow
+* กำหนดประเภทเอกสารที่ใช้ Flow นี้
+* เพิ่ม Step การอนุมัติ
+* ลบ Step การอนุมัติ
+* เรียงลำดับ Step
+* กำหนดผู้อนุมัติตาม Role
+* กำหนดผู้อนุมัติเฉพาะ User
+
+ตัวอย่าง
+
+Flow: อนุมัติใบแจ้งหนี้
+
+* Step 1: ACCOUNTANT
+* Step 2: FINANCE
+* Step 3: OWNER
+
+### 4.12 หน้างานที่รออนุมัติ
+
+Path ตัวอย่าง: `/approvals`
+
+ต้องมีความสามารถ
+
+* แสดงเอกสารที่รออนุมัติ
+* ดูรายละเอียดเอกสาร
+* Preview เอกสาร
+* อนุมัติ
+* ไม่อนุมัติ
+* ใส่หมายเหตุ
+* ดูประวัติการอนุมัติ
+
+### 4.13 หน้าตั้งค่าเลขเอกสาร
+
+Path ตัวอย่าง: `/document-number-settings`
+
+ต้องมีความสามารถ
+
+* ตั้งค่าเลขเอกสารแยกตามประเภทเอกสาร
+* กำหนด Prefix เช่น QT, INV, TAX, HR
+* กำหนดจำนวนหลัก เช่น 0001
+* กำหนด Running Number
+* กำหนด Reset Mode เช่น YEARLY, MONTHLY, NEVER
+* Preview เลขเอกสาร เช่น QT-2026-0001
+
+### 4.14 หน้ารายงาน
+
+Path ตัวอย่าง: `/reports`
+
+ต้องมีรายงาน เช่น
+
+* รายงานจำนวนเอกสาร
+* รายงานเอกสารตามหมวดหมู่
+* รายงานเอกสารตามสถานะ
+* รายงานเอกสารตามผู้สร้าง
+* รายงานเอกสารตามลูกค้า
+* รายงานเอกสารตามช่วงวันที่
+* Export รายงานเป็น Excel
+* Export รายงานเป็น PDF
+
+### 4.15 หน้าตั้งค่าบริษัท
+
+Path ตัวอย่าง: `/settings/company`
+
+ต้องมีความสามารถ
+
+* แก้ไขข้อมูลบริษัท
+* เปลี่ยนโลโก้
+* แก้ไขที่อยู่
+* แก้ไขเลขประจำตัวผู้เสียภาษี
+* ตั้งค่าภาษา
+* ตั้งค่า Theme
+* ตั้งค่า Default Paper Size
+* ตั้งค่า Default VAT
+* ตั้งค่าลายเซ็นบริษัท
+
+### 4.16 หน้าจัดการผู้ใช้บริษัท
+
+Path ตัวอย่าง: `/settings/users`
+
+ต้องมีความสามารถ
+
+* แสดงผู้ใช้ในบริษัท
+* เพิ่มผู้ใช้
+* แก้ไขผู้ใช้
+* ลบผู้ใช้
+* เปลี่ยน Role
+* Reset Password
+* ระงับผู้ใช้
+* เปิดใช้งานผู้ใช้
+
+## 5. โครงสร้าง Sidebar Menu
+
+### 5.1 Sidebar ฝั่ง System Admin
+
+* Dashboard
+* บริษัท
+
+  * รายการบริษัท
+  * ผู้ใช้บริษัท
+* แพ็กเกจ
+* เอกสาร
+
+  * หมวดหมู่เอกสาร
+  * ประเภทเอกสาร
+  * Template กลาง
+* Audit Logs
+* ตั้งค่าระบบ
+
+### 5.2 Sidebar ฝั่ง Company User
+
+* Dashboard
+* เอกสาร
+
+  * เอกสารทั้งหมด
+  * สร้างเอกสาร
+  * รออนุมัติ
+* Template
+
+  * Template ทั้งหมด
+  * สร้าง Template
+  * Document Designer
+* ข้อมูลบริษัท
+
+  * ลูกค้า / คู่ค้า
+  * พนักงาน
+  * แผนก
+* ระบบอนุมัติ
+
+  * Flow การอนุมัติ
+  * งานที่รออนุมัติ
+* รายงาน
+* ตั้งค่า
+
+  * ตั้งค่าบริษัท
+  * ผู้ใช้งาน
+  * เลขเอกสาร
+
+## 6. Database ที่ต้องใช้
+
+สร้าง Prisma Schema สำหรับ MongoDB โดยมี Model หลักดังนี้
+
+* SystemAdmin
+* Plan
+* Subscription
+* Company
+* CompanyUser
+* Department
+* DocumentCategory
+* DocumentType
+* DocumentTemplate
+* TemplateField
+* Document
+* DocumentFile
+* BusinessPartner
+* Employee
+* ApprovalFlow
+* ApprovalStep
+* DocumentApproval
+* DocumentNumberSetting
+* AuditLog
+
+ทุก Model ที่เป็นข้อมูลของบริษัทต้องมี companyId เพื่อแยกข้อมูลของแต่ละบริษัท
+
+เวลา Query ข้อมูลฝั่งบริษัท ต้องใส่เงื่อนไข companyId ทุกครั้ง เช่น
+
+where: {
+companyId: currentUser.companyId
+}
+
+ห้ามให้บริษัทหนึ่งเห็นข้อมูลของอีกบริษัทเด็ดขาด
+
+## 7. API Routes ที่ต้องสร้าง
+
+### 7.1 Auth API
+
+* POST /api/auth/login
+* POST /api/auth/logout
+* GET /api/auth/me
+* POST /api/auth/register-company
+* POST /api/auth/forgot-password
+* POST /api/auth/reset-password
+
+### 7.2 System Admin API
+
+* GET /api/admin/dashboard
+
+* GET /api/admin/companies
+
+* POST /api/admin/companies
+
+* GET /api/admin/companies/:id
+
+* PUT /api/admin/companies/:id
+
+* DELETE /api/admin/companies/:id
+
+* PATCH /api/admin/companies/:id/status
+
+* GET /api/admin/company-users
+
+* POST /api/admin/company-users
+
+* PUT /api/admin/company-users/:id
+
+* DELETE /api/admin/company-users/:id
+
+* GET /api/admin/plans
+
+* POST /api/admin/plans
+
+* PUT /api/admin/plans/:id
+
+* DELETE /api/admin/plans/:id
+
+* GET /api/admin/document-categories
+
+* POST /api/admin/document-categories
+
+* PUT /api/admin/document-categories/:id
+
+* DELETE /api/admin/document-categories/:id
+
+* GET /api/admin/document-types
+
+* POST /api/admin/document-types
+
+* PUT /api/admin/document-types/:id
+
+* DELETE /api/admin/document-types/:id
+
+* GET /api/admin/templates
+
+* POST /api/admin/templates
+
+* PUT /api/admin/templates/:id
+
+* DELETE /api/admin/templates/:id
+
+* GET /api/admin/audit-logs
+
+### 7.3 Company API
+
+* GET /api/dashboard
+
+* GET /api/documents
+
+* POST /api/documents
+
+* GET /api/documents/:id
+
+* PUT /api/documents/:id
+
+* DELETE /api/documents/:id
+
+* POST /api/documents/:id/duplicate
+
+* POST /api/documents/:id/submit-approval
+
+* POST /api/documents/:id/export-pdf
+
+* POST /api/documents/:id/cancel
+
+* POST /api/documents/:id/archive
+
+* GET /api/templates
+
+* POST /api/templates
+
+* GET /api/templates/:id
+
+* PUT /api/templates/:id
+
+* DELETE /api/templates/:id
+
+* POST /api/templates/:id/duplicate
+
+* PUT /api/templates/:id/designer
+
+* GET /api/templates/:id/fields
+
+* POST /api/templates/:id/fields
+
+* PUT /api/templates/:id/fields/:fieldId
+
+* DELETE /api/templates/:id/fields/:fieldId
+
+* GET /api/business-partners
+
+* POST /api/business-partners
+
+* PUT /api/business-partners/:id
+
+* DELETE /api/business-partners/:id
+
+* GET /api/employees
+
+* POST /api/employees
+
+* PUT /api/employees/:id
+
+* DELETE /api/employees/:id
+
+* GET /api/departments
+
+* POST /api/departments
+
+* PUT /api/departments/:id
+
+* DELETE /api/departments/:id
+
+* GET /api/approval-flows
+
+* POST /api/approval-flows
+
+* PUT /api/approval-flows/:id
+
+* DELETE /api/approval-flows/:id
+
+* GET /api/approvals
+
+* POST /api/approvals/:documentId/approve
+
+* POST /api/approvals/:documentId/reject
+
+* GET /api/document-number-settings
+
+* POST /api/document-number-settings
+
+* PUT /api/document-number-settings/:id
+
+* DELETE /api/document-number-settings/:id
+
+* GET /api/reports/documents
+
+* GET /api/reports/export-excel
+
+* GET /api/reports/export-pdf
+
+## 8. สิทธิ์การใช้งาน
+
+สร้าง Middleware ตรวจสอบ Auth และ Role
+
+### 8.1 System Admin Permission
+
+System Admin สามารถเข้าเฉพาะ Path ที่ขึ้นต้นด้วย /admin
+
+Role ที่ใช้ได้
+
+* SUPER_ADMIN
+* ADMIN
+* SUPPORT
+
+### 8.2 Company Permission
+
+Company User สามารถเข้าเฉพาะข้อมูลของ companyId ตัวเอง
+
+กำหนดสิทธิ์คร่าว ๆ ดังนี้
+
+OWNER
+
+* ใช้งานได้ทุกเมนูของบริษัท
+* จัดการผู้ใช้
+* จัดการ Template
+* จัดการ Flow อนุมัติ
+* อนุมัติเอกสาร
+* ดูรายงานทั้งหมด
+
+ADMIN
+
+* จัดการเอกสาร
+* จัดการ Template
+* จัดการลูกค้า
+* จัดการพนักงาน
+* จัดการ Flow
+* ดูรายงาน
+
+ACCOUNTANT
+
+* จัดการเอกสารบัญชี
+* จัดการเอกสารภาษี
+* Export PDF
+* ส่งเอกสารอนุมัติ
+
+HR
+
+* จัดการเอกสารบุคคล
+* จัดการพนักงาน
+* ส่งเอกสารอนุมัติ
+
+OPERATION
+
+* จัดการเอกสารการดำเนินงาน
+* สร้าง Checklist
+* สร้างรายงานงาน
+
+STAFF
+
+* สร้างเอกสารที่ได้รับอนุญาต
+* ดูเอกสารของตัวเอง
+
+VIEWER
+
+* ดูข้อมูลอย่างเดียว
+* ห้ามสร้าง แก้ไข ลบ
+
+## 9. UI / UX ที่ต้องการ
+
+ออกแบบ UI ให้ดูทันสมัย สะอาด ใช้งานง่าย เหมาะกับระบบเอกสารองค์กร
+
+### 9.1 Style
+
+* ใช้โทนสีขาว เทา น้ำเงิน หรือม่วงอ่อน
+* รองรับ Dark Mode
+* ใช้ Card Layout
+* ใช้ Table แบบมี Search / Filter / Pagination
+* ใช้ Modal สำหรับ Create / Edit
+* ใช้ Drawer หรือ Sheet สำหรับดูรายละเอียด
+* ใช้ Toast แจ้งผลลัพธ์
+* ใช้ Loading Skeleton
+* ใช้ Empty State ตอนยังไม่มีข้อมูล
+* ใช้ Confirm Dialog ก่อนลบข้อมูล
+
+### 9.2 Components ที่ควรสร้าง
+
+* DataTable
+* PageHeader
+* SearchInput
+* FilterDropdown
+* StatusBadge
+* RoleBadge
+* ConfirmDialog
+* FormModal
+* DetailDrawer
+* FileUploader
+* ImageUploader
+* PdfPreview
+* DocumentStatusBadge
+* TemplateCard
+* DesignerCanvas
+* DesignerToolbar
+* DesignerElementPanel
+* DesignerPropertyPanel
+* DesignerPageManager
+
+## 10. ระบบ Document Designer แบบละเอียด
+
+สร้าง Designer ให้มี State หลักดังนี้
+
+* selectedPageId
+* selectedElementId
+* zoom
+* pages
+* elements
+* history สำหรับ undo/redo
+* isDirty
+* isSaving
+
+### 10.1 Page Manager
+
+ต้องทำ Function ต่อไปนี้
+
+* addPage()
+* updatePage(pageId, data)
+* deletePage(pageId)
+* duplicatePage(pageId)
+* reorderPage(fromIndex, toIndex)
+* selectPage(pageId)
+
+เงื่อนไข
+
+* ถ้ามีหน้าเดียว ห้ามลบหน้าสุดท้าย
+* เมื่อ Duplicate หน้า ต้อง copy elements ทั้งหมดและสร้าง id ใหม่
+* เมื่อ Reorder หน้า ต้อง update order ใหม่
+* เมื่อ Delete หน้า ต้องเลือกหน้าก่อนหน้าหรือหน้าถัดไปอัตโนมัติ
+
+### 10.2 Element Manager
+
+ต้องทำ Function ต่อไปนี้
+
+* addElement(type)
+* updateElement(elementId, data)
+* deleteElement(elementId)
+* duplicateElement(elementId)
+* moveElement(elementId, x, y)
+* resizeElement(elementId, width, height)
+* selectElement(elementId)
+
+Element ทุกตัวต้องมีข้อมูล
+
+* id
+* type
+* pageId
+* x
+* y
+* width
+* height
+* content
+* style
+* config
+
+### 10.3 Dynamic Field
+
+รองรับการวางตัวแปรใน Template เช่น
+
+* {{company.name}}
+* {{company.taxId}}
+* {{company.address}}
+* {{customer.name}}
+* {{customer.taxId}}
+* {{document.documentNo}}
+* {{document.date}}
+* {{document.total}}
+* {{employee.name}}
+* {{employee.position}}
+
+เมื่อสร้างเอกสารจริง ระบบต้องแทนค่าจาก dataJson ลงใน Template
+
+## 11. ระบบ Export PDF
+
+สร้างระบบ Export PDF จาก Template และ Document Data
+
+ความสามารถ
+
+* Export PDF จาก Document
+* Export PDF จาก Preview
+* Export PDF หลายหน้า
+* รองรับ A4 แนวตั้ง/แนวนอน
+* รองรับ Font ภาษาไทย
+* รองรับรูปภาพ โลโก้ ลายเซ็น
+* เก็บ pdfUrl ไว้ใน Document
+* บันทึกประวัติการ Export ลง AuditLog
+
+## 12. Validation และ Error Handling
+
+ใช้ Zod Validate ทุก Form และ API
+
+ต้องมี Error Handling เช่น
+
+* กรอกข้อมูลไม่ครบ
+* Email ซ้ำในบริษัทเดียวกัน
+* เลขเอกสารซ้ำ
+* ไม่พบข้อมูล
+* ไม่มีสิทธิ์เข้าถึง
+* บริษัทถูกระงับ
+* Template ไม่ Active
+* ลบข้อมูลที่ถูกใช้งานอยู่ไม่ได้
+* Export PDF ไม่สำเร็จ
+
+## 13. Security
+
+ระบบต้องมีความปลอดภัยดังนี้
+
+* Hash Password ด้วย bcrypt
+* ตรวจสอบ Session ทุก API
+* ตรวจสอบ Role ทุก API
+* ตรวจสอบ companyId ทุก Query
+* ห้ามรับ companyId จาก client โดยตรงถ้าเป็นข้อมูลสำคัญ ให้ใช้ companyId จาก session
+* ป้องกันบริษัทหนึ่งเข้าถึงข้อมูลของอีกบริษัท
+* Validate input ทุกครั้ง
+* บันทึก AuditLog สำหรับ Action สำคัญ
+* จำกัดขนาดไฟล์ Upload
+* ตรวจสอบชนิดไฟล์ก่อน Upload
+
+## 14. Seed Data
+
+สร้าง Seed Data เริ่มต้น
+
+### 14.1 Document Categories
+
+* เอกสารจดทะเบียน
+* เอกสารด้านบัญชีและการเงิน
+* เอกสารภาษี
+* เอกสารบุคคล
+* เอกสารการดำเนินงาน
+
+### 14.2 Document Types
+
+เอกสารจดทะเบียน
+
+* หนังสือรับรองบริษัท
+* ใบทะเบียนพาณิชย์
+* ภ.พ.20
+* บอจ.5
+
+เอกสารด้านบัญชีและการเงิน
+
+* ใบเสนอราคา
+* ใบแจ้งหนี้
+* ใบเสร็จรับเงิน
+* ใบวางบิล
+* รายงานรายรับรายจ่าย
+
+เอกสารภาษี
+
+* ใบกำกับภาษี
+* ภ.ง.ด.1
+* ภ.ง.ด.3
+* ภ.ง.ด.53
+* ภ.พ.30
+
+เอกสารบุคคล
+
+* สัญญาจ้างงาน
+* ใบลา
+* หนังสือรับรองเงินเดือน
+* ประวัติพนักงาน
+
+เอกสารการดำเนินงาน
+
+* รายงานการประชุม
+* ใบสั่งงาน
+* ใบตรวจงาน
+* Checklist งาน
+
+### 14.3 Default Plan
+
+* Free
+* Starter
+* Professional
+* Business
+
+### 14.4 Default System Admin
+
+สร้าง System Admin เริ่มต้น 1 คน
+
+* username: admin
+* email: [admin@example.com](mailto:admin@example.com)
+* role: SUPER_ADMIN
+
+## 15. โครงสร้างโฟลเดอร์ที่ต้องการ
+
+จัดโครงสร้างโปรเจ็กประมาณนี้
+
+src/
+app/
+admin/
+dashboard/
+companies/
+company-users/
+plans/
+document-categories/
+document-types/
+templates/
+audit-logs/
+dashboard/
+documents/
+create/
+[id]/
+templates/
+[id]/
+designer/
+fields/
+business-partners/
+employees/
+departments/
+approval-flows/
+approvals/
+reports/
+settings/
+company/
+users/
+api/
+admin/
+auth/
+documents/
+templates/
+business-partners/
+employees/
+departments/
+approvals/
+reports/
+components/
+layout/
+ui/
+tables/
+forms/
+designer/
+documents/
+templates/
+lib/
+prisma.ts
+auth.ts
+permissions.ts
+validators/
+pdf/
+utils.ts
+hooks/
+stores/
+types/
+generated/
+prisma/
+
+## 16. สิ่งที่ต้องทำให้ครบในเวอร์ชันแรก
+
+MVP ต้องทำให้ครบก่อน
+
+### 16.1 ฝั่ง System Admin
+
+* Login
+* Dashboard
+* CRUD บริษัท
+* CRUD หมวดหมู่เอกสาร
+* CRUD ประเภทเอกสาร
+* CRUD Template กลาง
+* Audit Log เบื้องต้น
+
+### 16.2 ฝั่ง Company
+
+* Login
+* Dashboard
+* CRUD เอกสาร
+* CRUD Template
+* Document Designer แบบเพิ่ม/แก้ไข/ลบหน้าได้
+* CRUD ลูกค้า
+* CRUD พนักงาน
+* Export PDF
+* Role Permission เบื้องต้น
+
+## 17. เงื่อนไขสำคัญ
+
+* ทุกหน้าต้องใช้งานจริงได้
+* ทุกปุ่มเพิ่ม แก้ไข ลบ ต้องทำงานจริง
+* ทุก Form ต้องมี Validation
+* ทุก Table ต้องมี Loading, Empty State และ Pagination
+* ทุก API ต้องตรวจสอบ Auth
+* ทุก Query ฝั่ง Company ต้องกรอง companyId
+* ห้ามใช้ข้อมูล Mock ถ้า API พร้อมแล้ว
+* เขียน Code ให้แยก Component ชัดเจน
+* ตั้งชื่อไฟล์และตัวแปรให้อ่านง่าย
+* รองรับภาษาไทย
+* รองรับ Font ภาษาไทยใน PDF
+* UI ต้องเรียบร้อย ใช้งานง่าย และเหมาะกับระบบบริษัท
+
+ให้เริ่มสร้างโปรเจ็กนี้ทีละส่วน โดยเริ่มจาก
+
+1. สร้าง Prisma Schema สำหรับ MongoDB
+2. สร้าง Auth
+3. สร้าง Layout Admin และ Company
+4. สร้าง CRUD หมวดหมู่เอกสาร
+5. สร้าง CRUD ประเภทเอกสาร
+6. สร้าง CRUD บริษัท
+7. สร้าง CRUD Template
+8. สร้าง Document Designer ที่เพิ่ม/แก้ไข/ลบหน้าได้
+9. สร้าง CRUD เอกสาร
+10. สร้าง Export PDF
+11. สร้างระบบอนุมัติ
+12. สร้าง Dashboard และ Reports

@@ -1,0 +1,16 @@
+{
+  "Navigation": {
+    "dashboard": "Dashboard",
+    "companies": "Companies",
+    "plans": "Plans",
+    "templates": "Templates",
+    "documents": "Documents",
+    "settings": "Settings"
+  },
+  "Auth": {
+    "login": "Login",
+    "email": "Email",
+    "password": "Password",
+    "invalid_credentials": "Invalid email or password"
+  }
+}
