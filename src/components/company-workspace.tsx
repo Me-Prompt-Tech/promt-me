@@ -1,3 +1,5 @@
+"use client";
+
 import {
   Copy,
   Download,
@@ -12,6 +14,11 @@ import {
   Send,
   Trash2,
 } from "lucide-react";
+import { useState, useTransition, useEffect } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { deleteDocument, createDocument, updateDocument, getDocumentById } from "@/app/actions/document-actions";
+import { ConfirmDialog } from "@/components/ui/app-components";
 import { DocumentDesigner } from "./document-designer";
 
 export type CompanySection =
@@ -117,15 +124,33 @@ function PageHeader({ section }: { section: CompanySection }) {
   );
 }
 
-function ActionButton({ label }: { label: string }) {
+type ActionDef = string | { label: string; onClick?: () => void; href?: string; destructive?: boolean };
+
+function ActionButton({ action, label: propLabel, onClick: propOnClick }: { action?: ActionDef; label?: string; onClick?: () => void }) {
+  const label = action ? (typeof action === "string" ? action : action.label) : propLabel || "";
+  const onClick = action ? (typeof action === "string" ? undefined : action.onClick) : propOnClick;
+  const href = action ? (typeof action === "string" ? undefined : action.href) : undefined;
+  const destructive = action ? (typeof action === "string" ? false : action.destructive) : false;
+  
   const Icon = label.includes("ลบ") ? Trash2 : label.includes("แก้") ? Pencil : label.includes("Duplicate") ? Copy : label.includes("Export") || label.includes("Download") ? Download : label.includes("Preview") || label.includes("รายละเอียด") ? Eye : label.includes("อนุมัติ") ? Send : Plus;
-  return <button className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 text-xs font-medium text-slate-700 hover:bg-slate-50"><Icon className="size-3.5" />{label}</button>;
+  
+  const className = `inline-flex h-8 items-center gap-1.5 rounded-md border px-2 text-xs font-medium ${
+    destructive 
+      ? "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100" 
+      : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+  }`;
+  
+  if (href) {
+    return <Link href={href} className={className}><Icon className="size-3.5" />{label}</Link>;
+  }
+  
+  return <button onClick={onClick} className={className}><Icon className="size-3.5" />{label}</button>;
 }
 
-function Toolbar({ placeholder, filters = [], actions = [] }: { placeholder: string; filters?: string[]; actions?: string[] }) {
+function Toolbar({ placeholder, filters = [], actions = [] }: { placeholder: string; filters?: string[]; actions?: ActionDef[] }) {
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap gap-2">{actions.map((item) => <ActionButton key={item} label={item} />)}</div>
+      <div className="flex flex-wrap gap-2">{actions.map((item, idx) => <ActionButton key={typeof item === "string" ? item : item.label + idx} action={item} />)}</div>
       <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:flex-row">
         <label className="relative block">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
@@ -138,21 +163,30 @@ function Toolbar({ placeholder, filters = [], actions = [] }: { placeholder: str
   );
 }
 
-function DocumentTable() {
+function DocumentTable({ docs, onDelete }: { docs: any[]; onDelete: (id: string) => void }) {
   return (
     <table className="w-full min-w-[900px] text-left text-sm">
       <thead className="text-xs uppercase text-slate-500"><tr>{["เลขเอกสาร", "ชื่อเอกสาร", "หมวดหมู่", "ประเภท", "สถานะ", "ผู้สร้าง", "วันที่", "จัดการ"].map((h) => <th key={h} className="py-3 pr-4 font-semibold">{h}</th>)}</tr></thead>
       <tbody className="divide-y divide-slate-100">
-        {documents.map((doc) => (
+        {docs.length === 0 && (
+          <tr>
+            <td colSpan={8} className="py-8 text-center text-slate-500">ไม่มีเอกสาร</td>
+          </tr>
+        )}
+        {docs.map((doc) => (
           <tr key={doc.id}>
-            <td className="py-4 pr-4 font-semibold text-slate-950">{doc.id}</td>
-            <td className="py-4 pr-4 text-slate-700">{doc.name}</td>
-            <td className="py-4 pr-4 text-slate-600">{doc.category}</td>
-            <td className="py-4 pr-4 text-slate-600">{doc.type}</td>
+            <td className="py-4 pr-4 font-semibold text-slate-950">{doc.documentNo}</td>
+            <td className="py-4 pr-4 text-slate-700">{doc.title}</td>
+            <td className="py-4 pr-4 text-slate-600">{doc.category?.name || "-"}</td>
+            <td className="py-4 pr-4 text-slate-600">{doc.documentType?.name || "-"}</td>
             <td className="py-4 pr-4"><Status value={doc.status} /></td>
-            <td className="py-4 pr-4 text-slate-600">{doc.creator}</td>
-            <td className="py-4 pr-4 text-slate-600">{doc.created}</td>
-            <td className="py-4"><div className="flex flex-wrap gap-1.5">{["แก้ไข", "Duplicate", "Preview", "Export PDF", "ส่งอนุมัติ", "Archive"].map((a) => <ActionButton key={a} label={a} />)}</div></td>
+            <td className="py-4 pr-4 text-slate-600">{doc.createdBy?.name || "-"}</td>
+            <td className="py-4 pr-4 text-slate-600">{new Date(doc.createdAt).toLocaleDateString("th-TH")}</td>
+            <td className="py-4"><div className="flex flex-wrap gap-1.5">
+              <ActionButton action={{ label: "แก้ไข", href: `/th/documents/create?edit=${doc.id}` }} />
+              <ActionButton action={{ label: "Preview", href: `/th/documents/${doc.id}` }} />
+              <ActionButton action={{ label: "ลบ", destructive: true, onClick: () => onDelete(doc.id) }} />
+            </div></td>
           </tr>
         ))}
       </tbody>
@@ -160,7 +194,7 @@ function DocumentTable() {
   );
 }
 
-function Dashboard() {
+function Dashboard({ docs = [] }: { docs?: any[] }) {
   const stats = [
     ["เอกสารทั้งหมด", "1,248"], ["ฉบับร่าง", "82"], ["รออนุมัติ", "36"], ["อนุมัติแล้ว", "904"], ["ลูกค้า", "186"], ["พนักงาน", "64"],
   ];
@@ -171,23 +205,119 @@ function Dashboard() {
         <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm"><h2 className="font-semibold">กราฟจำนวนเอกสารรายเดือน</h2><div className="mt-4 flex h-48 items-end gap-3">{[45, 62, 58, 74, 88, 96, 82].map((h, i) => <div key={i} className="flex-1 rounded-t bg-teal-500" style={{ height: `${h}%` }} />)}</div></div>
         <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm"><h2 className="font-semibold">กราฟแยกตามหมวดหมู่เอกสาร</h2><div className="mt-4 space-y-3">{["บัญชีและการเงิน", "ภาษี", "บุคคล", "การดำเนินงาน", "จดทะเบียน"].map((name, i) => <div key={name}><div className="flex justify-between text-sm"><span>{name}</span><span>{[42, 26, 14, 12, 6][i]}%</span></div><div className="mt-1 h-2 rounded bg-slate-100"><div className="h-2 rounded bg-teal-500" style={{ width: `${[42, 26, 14, 12, 6][i]}%` }} /></div></div>)}</div></div>
       </div>
-      <div className="grid gap-5 lg:grid-cols-2"><div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm"><h2 className="font-semibold">เอกสารล่าสุด</h2><div className="mt-3 overflow-x-auto"><DocumentTable /></div></div><Approvals compact /></div>
+      <div className="grid gap-5 lg:grid-cols-2"><div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm"><h2 className="font-semibold">เอกสารล่าสุด</h2><div className="mt-3 overflow-x-auto"><DocumentTable docs={docs.slice(0, 5)} onDelete={() => {}} /></div></div><Approvals compact /></div>
     </div>
   );
 }
 
-function CreateDocument() {
-  const steps = ["เลือกหมวดหมู่", "เลือกประเภทเอกสาร", "เลือก Template", "กรอกข้อมูล", "Preview", "Save Draft", "ส่งอนุมัติ", "Export PDF"];
+function CreateDocument({ categories = [], documentTypes = [] }: { categories?: any[]; documentTypes?: any[] }) {
+  const [isPending, startTransition] = useTransition();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const editId = searchParams.get("edit");
+  
+  const [formData, setFormData] = useState({
+    title: "",
+    documentNo: "",
+    categoryId: "",
+    documentTypeId: "",
+    dataJson: "{}",
+  });
+
+  useEffect(() => {
+    if (editId) {
+      getDocumentById(editId).then(res => {
+        if (res.success && res.data) {
+          setFormData({
+            title: res.data.title || "",
+            documentNo: res.data.documentNo || "",
+            categoryId: res.data.categoryId || "",
+            documentTypeId: res.data.documentTypeId || "",
+            dataJson: JSON.stringify(res.data.dataJson) || "{}",
+          });
+        }
+      });
+    } else {
+      setFormData(prev => ({ ...prev, documentNo: `DOC-${Date.now()}` }));
+    }
+  }, [editId]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    startTransition(async () => {
+      const payload = {
+        title: formData.title,
+        documentNo: formData.documentNo,
+        categoryId: formData.categoryId || undefined,
+        documentTypeId: formData.documentTypeId || undefined,
+        dataJson: JSON.parse(formData.dataJson || "{}"),
+      };
+      
+      let res;
+      if (editId) {
+        res = await updateDocument(editId, payload);
+      } else {
+        res = await createDocument({ ...payload, status: "DRAFT" });
+      }
+      
+      if (res.success) {
+        router.push("/th/documents");
+      } else {
+        alert("Error saving document: " + res.error);
+      }
+    });
+  };
+
   return (
     <div className="grid gap-5 lg:grid-cols-[1fr_380px]">
-      <div className="space-y-4">{steps.map((step, i) => <div key={step} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"><div className="flex items-center gap-3"><span className="grid size-8 place-items-center rounded-full bg-teal-600 text-sm font-semibold text-white">{i + 1}</span><h2 className="font-semibold text-slate-950">{step}</h2></div><div className="mt-3 grid gap-2 sm:grid-cols-3"><input className="h-10 rounded-md border border-slate-200 px-3 text-sm" placeholder={`${step}...`} /><button className="h-10 rounded-md border border-slate-200 text-sm">เลือก</button><button className="h-10 rounded-md bg-slate-950 text-sm text-white">ถัดไป</button></div></div>)}</div>
-      <DocumentPreview />
+      <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <h2 className="text-xl font-semibold mb-4">{editId ? "แก้ไขเอกสาร" : "สร้างเอกสารใหม่"}</h2>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <label className="block">
+            <span className="text-sm font-medium">ชื่อเอกสาร</span>
+            <input 
+              required
+              className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm" 
+              value={formData.title}
+              onChange={(e) => setFormData({...formData, title: e.target.value})}
+            />
+          </label>
+          <label className="block">
+            <span className="text-sm font-medium">หมวดหมู่</span>
+            <select 
+              required
+              className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm"
+              value={formData.categoryId}
+              onChange={(e) => setFormData({...formData, categoryId: e.target.value})}
+            >
+              <option value="">-- เลือกหมวดหมู่ --</option>
+              {categories.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </label>
+          <label className="block">
+            <span className="text-sm font-medium">ประเภทเอกสาร</span>
+            <select 
+              required
+              className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm"
+              value={formData.documentTypeId}
+              onChange={(e) => setFormData({...formData, documentTypeId: e.target.value})}
+            >
+              <option value="">-- เลือกประเภทเอกสาร --</option>
+              {documentTypes.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          </label>
+          <button type="submit" disabled={isPending} className="mt-4 w-full h-10 rounded-md bg-teal-600 text-white font-medium hover:bg-teal-700 disabled:opacity-50">
+            {isPending ? "กำลังบันทึก..." : "บันทึกเอกสาร"}
+          </button>
+        </form>
+      </div>
+      <DocumentPreview title={formData.title} documentNo={formData.documentNo} />
     </div>
   );
 }
 
-function DocumentPreview() {
-  return <aside className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm"><h2 className="font-semibold text-slate-950">Preview เอกสาร</h2><div className="mt-4 rounded-md bg-slate-100 p-4"><div className="min-h-[460px] rounded bg-white p-6 shadow"><p className="text-xl font-bold">ใบเสนอราคา</p><p className="mt-2 text-sm text-slate-500">QT-2026-0718</p><div className="mt-8 h-20 rounded border border-dashed border-slate-300" /><div className="mt-4 h-32 rounded border border-slate-200 bg-slate-50" /><p className="mt-8 text-right text-lg font-semibold">฿128,500</p></div></div></aside>;
+function DocumentPreview({ title, documentNo }: { title?: string; documentNo?: string }) {
+  return <aside className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm"><h2 className="font-semibold text-slate-950">Preview เอกสาร</h2><div className="mt-4 rounded-md bg-slate-100 p-4"><div className="min-h-[460px] rounded bg-white p-6 shadow"><p className="text-xl font-bold">{title || "ชื่อเอกสาร"}</p><p className="mt-2 text-sm text-slate-500">{documentNo || "DOC-XXXX"}</p><div className="mt-8 h-20 rounded border border-dashed border-slate-300" /><div className="mt-4 h-32 rounded border border-slate-200 bg-slate-50" /><p className="mt-8 text-right text-lg font-semibold">฿0.00</p></div></div></aside>;
 }
 
 function DocumentDetail() {
@@ -270,15 +400,48 @@ function DataTable({ headers, rows, actions }: { headers: string[]; rows: (strin
   return <div className="space-y-4"><div className="flex flex-wrap gap-2">{actions.map((a) => <ActionButton key={a} label={a} />)}</div><div className="overflow-x-auto rounded-lg border border-slate-200 bg-white p-4 shadow-sm"><table className="w-full min-w-[900px] text-left text-sm"><thead className="text-xs uppercase text-slate-500"><tr>{headers.map((h) => <th key={h} className="py-3 pr-4 font-semibold">{h}</th>)}<th className="py-3 font-semibold">จัดการ</th></tr></thead><tbody className="divide-y divide-slate-100">{rows.map((row, i) => <tr key={i}>{row.map((cell, j) => <td key={j} className="py-4 pr-4 text-slate-700">{cell}</td>)}<td className="py-4"><div className="flex gap-1.5"><ActionButton label="แก้ไข" /><ActionButton label="ลบ" /></div></td></tr>)}</tbody></table></div></div>;
 }
 
-export function CompanyWorkspace({ section }: { section: CompanySection }) {
+export function CompanyWorkspace({ section, data }: { section: CompanySection; data?: any }) {
   const meta = sectionMeta[section];
+  
+  const [isPending, startTransition] = useTransition();
+  const [documentToDelete, setDocumentToDelete] = useState<string | null>(null);
+
+  const confirmDeleteDoc = () => {
+    if (!documentToDelete) return;
+    startTransition(async () => {
+      await deleteDocument(documentToDelete);
+      setDocumentToDelete(null);
+    });
+  };
+
   return (
     <div className="min-h-full bg-[#f6f8fb] text-slate-950 dark:bg-slate-950 dark:text-slate-100">
+      <ConfirmDialog
+        open={!!documentToDelete}
+        title="ยืนยันการลบเอกสาร"
+        description="คุณแน่ใจหรือไม่ว่าต้องการลบเอกสารนี้? การกระทำนี้ไม่สามารถย้อนกลับได้"
+        onCancel={() => setDocumentToDelete(null)}
+        onConfirm={confirmDeleteDoc}
+        confirmText={isPending ? "กำลังลบ..." : "ยืนยันลบ"}
+      />
       <PageHeader section={section} />
       <main className="mx-auto max-w-7xl space-y-5 px-4 py-6 sm:px-6 lg:px-8">
-        {section === "dashboard" && <Dashboard />}
-        {section === "documents" && <><Toolbar placeholder="ค้นหาเลขเอกสารหรือชื่อเอกสาร" filters={["หมวดหมู่", "ประเภทเอกสาร", "สถานะ", "วันที่"]} actions={["เพิ่มเอกสาร", "แก้ไข", "ลบ", "Duplicate", "Preview", "Export PDF", "Download PDF", "ส่งอนุมัติ", "ยกเลิก", "Archive"]} /><div className="overflow-x-auto rounded-lg border border-slate-200 bg-white p-4 shadow-sm"><DocumentTable /></div></>}
-        {section === "document-create" && <CreateDocument />}
+        {section === "dashboard" && <Dashboard docs={data?.documents || []} />}
+        {section === "documents" && (
+          <>
+            <Toolbar 
+              placeholder="ค้นหาเลขเอกสารหรือชื่อเอกสาร" 
+              filters={["หมวดหมู่", "ประเภทเอกสาร", "สถานะ", "วันที่"]} 
+              actions={[
+                { label: "เพิ่มเอกสาร", href: "/th/documents/create" }, 
+              ]} 
+            />
+            <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+              <DocumentTable docs={data?.documents || []} onDelete={setDocumentToDelete} />
+            </div>
+          </>
+        )}
+        {section === "document-create" && <CreateDocument categories={data?.categories} documentTypes={data?.documentTypes} />}
         {section === "document-detail" && <DocumentDetail />}
         {section === "templates" && <><Toolbar placeholder="ค้นหา Template" filters={["Company/Global", "สถานะ"]} actions={["เพิ่ม Template", "แก้ไข", "ลบ", "Duplicate", "Preview", "Active/Inactive", "Designer"]} /><Templates /></>}
         {section === "designer" && <Designer />}

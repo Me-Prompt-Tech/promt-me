@@ -219,12 +219,14 @@ export function ConfirmDialog({
 export function FormModal({
   open,
   title,
+  description,
   children,
   onClose,
   onSubmit,
 }: {
   open: boolean;
   title: string;
+  description?: string;
   children: ReactNode;
   onClose?: () => void;
   onSubmit?: () => void;
@@ -233,8 +235,11 @@ export function FormModal({
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/50 p-4">
       <div className="w-full max-w-2xl rounded-lg border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-950">
-        <div className="flex items-center justify-between border-b border-slate-200 p-4 dark:border-slate-800">
-          <h2 className="text-lg font-semibold text-slate-950 dark:text-white">{title}</h2>
+        <div className="flex items-start justify-between border-b border-slate-200 p-4 dark:border-slate-800">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-950 dark:text-white">{title}</h2>
+            {description && <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{description}</p>}
+          </div>
           <button onClick={onClose} className="grid size-8 place-items-center rounded-md hover:bg-slate-100 dark:hover:bg-slate-900">
             <X className="size-4" />
           </button>
