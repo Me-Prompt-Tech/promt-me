@@ -1,13 +1,11 @@
 import { SystemAdminWorkspace } from "@/components/system-admin-workspace";
-import { getGlobalTemplates } from "@/app/actions/admin-template-actions";
-import { getDocumentCategories } from "@/app/actions/admin-category-actions";
-import { getDocumentTypes } from "@/app/actions/admin-type-actions";
+import { dbList } from "@/lib/api-router";
 
 export default async function AdminTemplatesPage() {
   const [templatesRes, categoriesRes, typesRes] = await Promise.all([
-    getGlobalTemplates(),
-    getDocumentCategories(),
-    getDocumentTypes(),
+    dbList("templates", { isGlobal: true }),
+    dbList("document-categories", { isGlobal: true }),
+    dbList("document-types", { isGlobal: true }),
   ]);
 
   const data = {

@@ -1,9 +1,12 @@
 import { CompanyWorkspace } from "@/components/company-workspace";
-import { getDocuments } from "@/app/actions/document-actions";
+import { dbList } from "@/lib/api-router";
+import { auth } from "@/auth";
 
 export default async function DocumentsPage() {
-  const result = await getDocuments();
-  const documents = result.success ? result.data : [];
+  const session = await auth();
+  const companyId = (session?.user as any)?.companyId;
+  const result = await dbList("documents", companyId ? { companyId } : {});
+  const documents = result.ok ? result.data : [];
 
   return <CompanyWorkspace section="documents" data={{ documents }} />;
 }

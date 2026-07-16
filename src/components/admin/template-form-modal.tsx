@@ -2,7 +2,6 @@
 
 import { useState, useTransition, useEffect } from "react";
 import { FormModal } from "@/components/ui/app-components";
-import { createGlobalTemplate, updateGlobalTemplate } from "@/app/actions/admin-template-actions";
 
 export type TemplateData = {
   id?: string;
@@ -64,28 +63,33 @@ export function TemplateFormModal({
     e.preventDefault();
     startTransition(async () => {
       let res;
-      if (formData.id) {
-        res = await updateGlobalTemplate(formData.id, {
+      try {
+        const payload = {
           name: formData.name,
           slug: formData.slug,
           description: formData.description,
           categoryId: formData.categoryId,
           documentTypeId: formData.documentTypeId,
+          isGlobal: true,
+        };
+        const url = formData.id
+          ? `/api/admin/templates/${formData.id}`
+          : "/api/admin/templates";
+        
+        const response = await fetch(url, {
+          method: formData.id ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
         });
-      } else {
-        res = await createGlobalTemplate({
-          name: formData.name,
-          slug: formData.slug,
-          description: formData.description,
-          categoryId: formData.categoryId,
-          documentTypeId: formData.documentTypeId,
-        });
+        res = await response.json();
+      } catch (err: any) {
+        res = { ok: false, error: err.message };
       }
 
       if (res.ok) {
         onSuccess();
       } else {
-        alert(res.error || "Something went wrong");
+        alert(res.error || res.message || "Something went wrong");
       }
     });
   };

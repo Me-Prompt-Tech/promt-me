@@ -2,7 +2,6 @@
 
 import { useState, useTransition, useEffect } from "react";
 import { FormModal } from "@/components/ui/app-components";
-import { createDocumentType, updateDocumentType } from "@/app/actions/admin-type-actions";
 
 export type DocumentTypeData = {
   id?: string;
@@ -55,17 +54,31 @@ export function TypeFormModal({
   }, [initialData, open, categories]);
 
   const handleSubmit = () => {
-    setError("");
+    console.log("initialData?.id : ", initialData?.id);
+    console.log("formData : ", formData);
     startTransition(async () => {
-      const res = initialData?.id
-        ? await updateDocumentType(initialData.id, formData)
-        : await createDocumentType(formData);
+      let res;
+      try {
+        const url = initialData?.id
+          ? `/api/admin/document-types/${initialData.id}`
+          : "/api/admin/document-types";
+        
+        const response = await fetch(url, {
+          method: initialData?.id ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(formData),
+        });
+        res = await response.json();
+      } catch (err: any) {
+        res = { ok: false, error: err.message || "Network error" };
+      }
 
+      console.log("res : ", res);
       if (res.ok) {
         onSuccess();
         onClose();
       } else {
-        setError(res.error || "Failed to save document type");
+        setError(res.error || res.message || "Failed to save document type");
       }
     });
   };

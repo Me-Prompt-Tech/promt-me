@@ -17,7 +17,7 @@ import {
 import { useState, useTransition, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { deleteDocument, createDocument, updateDocument, getDocumentById } from "@/app/actions/document-actions";
+
 import { ConfirmDialog } from "@/components/ui/app-components";
 import { DocumentDesigner } from "./document-designer";
 
@@ -210,7 +210,7 @@ function Dashboard({ docs = [] }: { docs?: any[] }) {
   );
 }
 
-function CreateDocument({ categories = [], documentTypes = [] }: { categories?: any[]; documentTypes?: any[] }) {
+function CreateDocument({ categories = [], documentTypes = [], companyId }: { categories?: any[]; documentTypes?: any[]; companyId?: string }) {
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -225,25 +225,28 @@ function CreateDocument({ categories = [], documentTypes = [] }: { categories?: 
   });
 
   useEffect(() => {
-    if (editId) {
-      getDocumentById(editId).then(res => {
-        if (res.success && res.data) {
-          setFormData({
-            title: res.data.title || "",
-            documentNo: res.data.documentNo || "",
-            categoryId: res.data.categoryId || "",
-            documentTypeId: res.data.documentTypeId || "",
-            dataJson: JSON.stringify(res.data.dataJson) || "{}",
-          });
-        }
-      });
-    } else {
+    if (editId && companyId) {
+      fetch(`/api/company/${companyId}/documents/${editId}`)
+        .then(res => res.json())
+        .then(res => {
+          if (res.ok && res.data) {
+            setFormData({
+              title: res.data.title || "",
+              documentNo: res.data.documentNo || "",
+              categoryId: res.data.categoryId || "",
+              documentTypeId: res.data.documentTypeId || "",
+              dataJson: JSON.stringify(res.data.dataJson) || "{}",
+            });
+          }
+        });
+    } else if (!editId) {
       setFormData(prev => ({ ...prev, documentNo: `DOC-${Date.now()}` }));
     }
-  }, [editId]);
+  }, [editId, companyId]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!companyId) return alert("Company ID is required");
     startTransition(async () => {
       const payload = {
         title: formData.title,
@@ -254,16 +257,28 @@ function CreateDocument({ categories = [], documentTypes = [] }: { categories?: 
       };
       
       let res;
-      if (editId) {
-        res = await updateDocument(editId, payload);
-      } else {
-        res = await createDocument({ ...payload, status: "DRAFT" });
+      try {
+        if (editId) {
+          res = await fetch(`/api/company/${companyId}/documents/${editId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          }).then(r => r.json());
+        } else {
+          res = await fetch(`/api/company/${companyId}/documents`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ...payload, status: "DRAFT" })
+          }).then(r => r.json());
+        }
+      } catch (err: any) {
+        res = { ok: false, error: err.message };
       }
       
-      if (res.success) {
-        router.push("/th/documents");
+      if (res.ok) {
+        window.location.href = "/th/documents";
       } else {
-        alert("Error saving document: " + res.error);
+        alert("Error saving document: " + (res.error || res.message || "Failed"));
       }
     });
   };
@@ -400,17 +415,18 @@ function DataTable({ headers, rows, actions }: { headers: string[]; rows: (strin
   return <div className="space-y-4"><div className="flex flex-wrap gap-2">{actions.map((a) => <ActionButton key={a} label={a} />)}</div><div className="overflow-x-auto rounded-lg border border-slate-200 bg-white p-4 shadow-sm"><table className="w-full min-w-[900px] text-left text-sm"><thead className="text-xs uppercase text-slate-500"><tr>{headers.map((h) => <th key={h} className="py-3 pr-4 font-semibold">{h}</th>)}<th className="py-3 font-semibold">จัดการ</th></tr></thead><tbody className="divide-y divide-slate-100">{rows.map((row, i) => <tr key={i}>{row.map((cell, j) => <td key={j} className="py-4 pr-4 text-slate-700">{cell}</td>)}<td className="py-4"><div className="flex gap-1.5"><ActionButton label="แก้ไข" /><ActionButton label="ลบ" /></div></td></tr>)}</tbody></table></div></div>;
 }
 
-export function CompanyWorkspace({ section, data }: { section: CompanySection; data?: any }) {
+export function CompanyWorkspace({ section, data, companyId }: { section: CompanySection; data?: any; companyId?: string }) {
   const meta = sectionMeta[section];
   
   const [isPending, startTransition] = useTransition();
   const [documentToDelete, setDocumentToDelete] = useState<string | null>(null);
 
   const confirmDeleteDoc = () => {
-    if (!documentToDelete) return;
+    if (!documentToDelete || !companyId) return;
     startTransition(async () => {
-      await deleteDocument(documentToDelete);
+      await fetch(`/api/company/${companyId}/documents/${documentToDelete}`, { method: "DELETE" });
       setDocumentToDelete(null);
+      window.location.reload();
     });
   };
 
@@ -441,7 +457,7 @@ export function CompanyWorkspace({ section, data }: { section: CompanySection; d
             </div>
           </>
         )}
-        {section === "document-create" && <CreateDocument categories={data?.categories} documentTypes={data?.documentTypes} />}
+        {section === "document-create" && <CreateDocument categories={data?.categories} documentTypes={data?.documentTypes} companyId={companyId} />}
         {section === "document-detail" && <DocumentDetail />}
         {section === "templates" && <><Toolbar placeholder="ค้นหา Template" filters={["Company/Global", "สถานะ"]} actions={["เพิ่ม Template", "แก้ไข", "ลบ", "Duplicate", "Preview", "Active/Inactive", "Designer"]} /><Templates /></>}
         {section === "designer" && <Designer />}

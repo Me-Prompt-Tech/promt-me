@@ -1,11 +1,10 @@
 import { SystemAdminWorkspace } from "@/components/system-admin-workspace";
-import { getDocumentTypes } from "@/app/actions/admin-type-actions";
-import { getDocumentCategories } from "@/app/actions/admin-category-actions";
+import { dbList } from "@/lib/api-router";
 
 export default async function AdminDocumentTypesPage() {
   const [typesRes, categoriesRes] = await Promise.all([
-    getDocumentTypes(),
-    getDocumentCategories()
+    dbList("document-types", { isGlobal: true }),
+    dbList("document-categories", { isGlobal: true })
   ]);
 
   const documentTypes = typesRes.ok ? typesRes.data : [];

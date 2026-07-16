@@ -1,15 +1,18 @@
 import { CompanyWorkspace } from "@/components/company-workspace";
-import { getDocumentCategories } from "@/app/actions/admin-category-actions";
-import { getDocumentTypes } from "@/app/actions/admin-type-actions";
+import { dbList } from "@/lib/api-router";
+import { auth } from "@/auth";
 
 export default async function CreateDocumentPage() {
+  const session = await auth();
+  const companyId = (session?.user as any)?.companyId;
+
   const [catRes, typeRes] = await Promise.all([
-    getDocumentCategories(),
-    getDocumentTypes()
+    dbList("document-categories", { isGlobal: true }),
+    dbList("document-types", { isGlobal: true })
   ]);
   
-  const categories = catRes.success ? catRes.data : [];
-  const documentTypes = typeRes.success ? typeRes.data : [];
+  const categories = catRes.ok ? catRes.data : [];
+  const documentTypes = typeRes.ok ? typeRes.data : [];
 
-  return <CompanyWorkspace section="document-create" data={{ categories, documentTypes }} />;
+  return <CompanyWorkspace section="document-create" data={{ categories, documentTypes }} companyId={companyId} />;
 }

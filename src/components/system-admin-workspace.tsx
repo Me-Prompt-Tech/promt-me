@@ -5,9 +5,7 @@ import { CategoryFormModal, type CategoryData } from "@/components/admin/categor
 import { TypeFormModal, type DocumentTypeData } from "@/components/admin/type-form-modal";
 import { TemplateFormModal, type TemplateData } from "@/components/admin/template-form-modal";
 import { ConfirmDialog } from "@/components/ui/app-components";
-import { deleteDocumentCategory, toggleDocumentCategoryStatus } from "@/app/actions/admin-category-actions";
-import { deleteDocumentType, toggleDocumentTypeStatus } from "@/app/actions/admin-type-actions";
-import { deleteGlobalTemplate, toggleGlobalTemplateStatus } from "@/app/actions/admin-template-actions";
+
 import {
   Activity,
   Building2,
@@ -674,13 +672,7 @@ function AuditTable() {
   );
 }
 
-export function SystemAdminWorkspace({
-  section,
-  data
-}: {
-  section: AdminSection;
-  data?: any;
-}) {
+export function SystemAdminWorkspace({ section, data }: { section: AdminSection; data?: any; }) {
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<CategoryData | null>(null);
   const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
@@ -708,14 +700,20 @@ export function SystemAdminWorkspace({
   const confirmDeleteTemplate = () => {
     if (!templateToDelete) return;
     startTransition(async () => {
-      await deleteGlobalTemplate(templateToDelete);
+      await fetch(`/api/admin/templates/${templateToDelete}`, { method: "DELETE" });
       setTemplateToDelete(null);
+      window.location.reload();
     });
   };
 
   const handleToggleTemplateStatus = (id: string, currentStatus: boolean) => {
     startTransition(async () => {
-      await toggleGlobalTemplateStatus(id, currentStatus);
+      await fetch(`/api/admin/templates/${id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isActive: !currentStatus })
+      });
+      window.location.reload();
     });
   };
 
@@ -738,14 +736,20 @@ export function SystemAdminWorkspace({
   const confirmDeleteCategory = () => {
     if (!categoryToDelete) return;
     startTransition(async () => {
-      await deleteDocumentCategory(categoryToDelete);
+      await fetch(`/api/admin/document-categories/${categoryToDelete}`, { method: "DELETE" });
       setCategoryToDelete(null);
+      window.location.reload();
     });
   };
 
   const handleToggleCategoryStatus = (id: string, current: boolean) => {
     startTransition(async () => {
-      await toggleDocumentCategoryStatus(id, current);
+      await fetch(`/api/admin/document-categories/${id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isActive: !current })
+      });
+      window.location.reload();
     });
   };
 
@@ -766,14 +770,20 @@ export function SystemAdminWorkspace({
   const confirmDeleteType = () => {
     if (!typeToDelete) return;
     startTransition(async () => {
-      await deleteDocumentType(typeToDelete);
+      await fetch(`/api/admin/document-types/${typeToDelete}`, { method: "DELETE" });
       setTypeToDelete(null);
+      window.location.reload();
     });
   };
 
   const handleToggleTypeStatus = (id: string, current: boolean) => {
     startTransition(async () => {
-      await toggleDocumentTypeStatus(id, current);
+      await fetch(`/api/admin/document-types/${id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isActive: !current })
+      });
+      window.location.reload();
     });
   };
 

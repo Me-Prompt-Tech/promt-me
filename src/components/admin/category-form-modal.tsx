@@ -2,7 +2,6 @@
 
 import { useState, useTransition, useEffect } from "react";
 import { FormModal } from "@/components/ui/app-components";
-import { createDocumentCategory, updateDocumentCategory } from "@/app/actions/admin-category-actions";
 
 export type CategoryData = {
   id?: string;
@@ -55,15 +54,27 @@ export function CategoryFormModal({
   const handleSubmit = () => {
     setError("");
     startTransition(async () => {
-      const res = initialData?.id
-        ? await updateDocumentCategory(initialData.id, formData)
-        : await createDocumentCategory(formData);
+      let res;
+      try {
+        const url = initialData?.id
+          ? `/api/admin/document-categories/${initialData.id}`
+          : "/api/admin/document-categories";
+        
+        const response = await fetch(url, {
+          method: initialData?.id ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(formData),
+        });
+        res = await response.json();
+      } catch (err: any) {
+        res = { ok: false, error: err.message || "Network error" };
+      }
 
       if (res.ok) {
         onSuccess();
         onClose();
       } else {
-        setError(res.error || "Failed to save category");
+        setError(res.error || res.message || "Failed to save category");
       }
     });
   };
