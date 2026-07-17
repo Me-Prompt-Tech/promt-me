@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 import { generatePDFBuffer } from '@/lib/pdf-generator';
 import fs from 'fs/promises';
 import path from 'path';
 import { DesignerState } from '@/types/document-designer';
-
-const prisma = new PrismaClient();
 
 export async function POST(
   request: NextRequest,
@@ -89,7 +87,5 @@ export async function POST(
       { error: 'Failed to generate PDF', details: error.message },
       { status: 500 }
     );
-  } finally {
-    await prisma.$disconnect();
   }
 }

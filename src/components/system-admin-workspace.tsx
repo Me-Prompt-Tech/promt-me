@@ -599,22 +599,40 @@ function DocumentTypesTable({
   );
 }
 
-function TemplateGrid() {
+function TemplateGrid({
+  templates,
+  onEdit,
+  onDelete,
+  onToggleStatus
+}: {
+  templates: any[];
+  onEdit: (template: any) => void;
+  onDelete: (id: string) => void;
+  onToggleStatus: (id: string, current: boolean) => void;
+}) {
   return (
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
       {templates.map((template) => (
-        <div key={template.name} className="rounded-lg border border-slate-200 p-5 dark:border-slate-800">
+        <div key={template.id} className="rounded-lg border border-slate-200 p-5 dark:border-slate-800">
           <LayoutTemplate className="size-5 text-teal-700 dark:text-teal-300" />
           <h2 className="mt-4 font-semibold text-slate-950 dark:text-white">{template.name}</h2>
-          <p className="mt-1 text-sm text-slate-500">{template.category}</p>
-          <p className="text-sm text-slate-500">{template.type} · {template.mode}</p>
+          <p className="mt-1 text-sm text-slate-500">{template.category?.name || "ไม่ระบุหมวดหมู่"}</p>
+          <p className="text-sm text-slate-500">{template.documentType?.name || "ไม่ระบุประเภท"} · {template.templateMode}</p>
           <div className="mt-4 flex items-center justify-between gap-3">
-            <StatusBadge value={template.status} />
-            <StatusBadge value={template.global} />
+            <StatusBadge value={template.isActive ? "ACTIVE" : "INACTIVE"} />
+            <StatusBadge value={template.isGlobal ? "Yes" : "No"} />
           </div>
-          <div className="mt-4 flex flex-wrap gap-1.5">{["แก้ไข", "ลบ", "Duplicate", "Preview", "Designer"].map((item) => <IconButton key={item} label={item} destructive={item === "ลบ"} />)}</div>
+          <div className="mt-4 flex flex-wrap gap-1.5">
+            <IconButton label="แก้ไข" onClick={() => onEdit(template)} />
+            <IconButton label={template.isActive ? "ปิดใช้งาน" : "เปิดใช้งาน"} onClick={() => onToggleStatus(template.id, template.isActive)} />
+            <IconButton label="ลบ" destructive onClick={() => onDelete(template.id)} />
+            <IconButton label="Designer" onClick={() => window.open(`/th/admin/templates/${template.id}/designer`, '_blank')} />
+          </div>
         </div>
       ))}
+      {templates.length === 0 && (
+        <div className="col-span-full py-8 text-center text-slate-500">ไม่มีข้อมูล Template กลาง</div>
+      )}
     </div>
   );
 }
@@ -800,7 +818,15 @@ export function SystemAdminWorkspace({ section, data }: { section: AdminSection;
         initialData={editingType}
         categories={data?.categories || []}
         onClose={() => setIsTypeModalOpen(false)}
-        onSuccess={() => setIsTypeModalOpen(false)}
+        onSuccess={() => { setIsTypeModalOpen(false); window.location.reload(); }}
+      />
+      <TemplateFormModal
+        open={isTemplateModalOpen}
+        initialData={editingTemplate}
+        categories={data?.categories || []}
+        documentTypes={data?.documentTypes || []}
+        onClose={() => setIsTemplateModalOpen(false)}
+        onSuccess={() => { setIsTemplateModalOpen(false); window.location.reload(); }}
       />
       <ConfirmDialog
         open={!!categoryToDelete}
@@ -818,12 +844,21 @@ export function SystemAdminWorkspace({ section, data }: { section: AdminSection;
         onConfirm={confirmDeleteType}
         confirmText={isPending ? "กำลังลบ..." : "ยืนยันลบ"}
       />
+      <ConfirmDialog
+        open={!!templateToDelete}
+        title="ยืนยันการลบ Template"
+        description="คุณแน่ใจหรือไม่ว่าต้องการลบ Template นี้? การกระทำนี้ไม่สามารถย้อนกลับได้"
+        onCancel={() => setTemplateToDelete(null)}
+        onConfirm={confirmDeleteTemplate}
+        confirmText={isPending ? "กำลังลบ..." : "ยืนยันลบ"}
+      />
       <PageHeader
         section={section}
         onAdd={
           section === "document-categories" ? handleAddCategory :
             section === "document-types" ? handleAddType :
-              undefined
+              section === "templates" ? handleAddTemplate :
+                undefined
         }
       />
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
@@ -897,7 +932,12 @@ export function SystemAdminWorkspace({ section, data }: { section: AdminSection;
 
         {section === "templates" && (
           <DataShell placeholder="ค้นหา Template กลาง หมวดหมู่ หรือประเภทเอกสาร" filters={["Global: ทั้งหมด", "หมวดหมู่: ทั้งหมด", "ประเภทเอกสาร: ทั้งหมด", "สถานะ: ทั้งหมด"]} actions={actions.templates}>
-            <TemplateGrid />
+            <TemplateGrid 
+              templates={data?.templates || []}
+              onEdit={handleEditTemplate}
+              onDelete={setTemplateToDelete}
+              onToggleStatus={handleToggleTemplateStatus}
+            />
           </DataShell>
         )}
 

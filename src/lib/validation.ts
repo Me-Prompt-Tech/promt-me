@@ -116,6 +116,7 @@ export const documentCategorySchema = z.object({
   icon: optionalString,
   showOrder: z.coerce.number().int().min(0).default(0),
   isActive: z.boolean().default(true),
+  isGlobal: z.boolean().default(false),
 });
 
 export const documentTypeSchema = documentCategorySchema.extend({

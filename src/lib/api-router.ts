@@ -67,10 +67,20 @@ function handleApiError(errorValue: unknown) {
     return json(apiErrorPayload(errorValue), errorValue.status);
   }
 
+  if (typeof errorValue === "object" && errorValue !== null && "code" in errorValue && (errorValue as any).code === "P2002") {
+    return json({
+      ok: false,
+      code: "VALIDATION_ERROR",
+      message: "มีข้อมูลนี้อยู่ในระบบแล้ว (ข้อมูลซ้ำซ้อน)",
+      error: (errorValue as Error).message,
+    }, 400);
+  }
+
   return json({
     ok: false,
     code: "BAD_REQUEST",
     message: "เกิดข้อผิดพลาดในการทำรายการ",
+    error: errorValue instanceof Error ? errorValue.message : "Unknown error",
   }, 500);
 }
 

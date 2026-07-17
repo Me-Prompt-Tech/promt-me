@@ -63,7 +63,7 @@ export function CategoryFormModal({
         const response = await fetch(url, {
           method: initialData?.id ? "PUT" : "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(formData),
+          body: JSON.stringify({ ...formData, isGlobal: true }),
         });
         res = await response.json();
       } catch (err: any) {

@@ -19,7 +19,9 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { ConfirmDialog } from "@/components/ui/app-components";
-import { DocumentDesigner } from "./document-designer";
+import { DocumentDesigner } from "@/components/document-designer";
+import { TaxInvoiceTemplate } from "@/components/templates/tax-invoice";
+import { QuotationTemplate } from "@/components/templates/quotation";
 
 export type CompanySection =
   | "dashboard"
@@ -131,19 +133,18 @@ function ActionButton({ action, label: propLabel, onClick: propOnClick }: { acti
   const onClick = action ? (typeof action === "string" ? undefined : action.onClick) : propOnClick;
   const href = action ? (typeof action === "string" ? undefined : action.href) : undefined;
   const destructive = action ? (typeof action === "string" ? false : action.destructive) : false;
-  
+
   const Icon = label.includes("ลบ") ? Trash2 : label.includes("แก้") ? Pencil : label.includes("Duplicate") ? Copy : label.includes("Export") || label.includes("Download") ? Download : label.includes("Preview") || label.includes("รายละเอียด") ? Eye : label.includes("อนุมัติ") ? Send : Plus;
-  
-  const className = `inline-flex h-8 items-center gap-1.5 rounded-md border px-2 text-xs font-medium ${
-    destructive 
-      ? "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100" 
+
+  const className = `inline-flex h-8 items-center gap-1.5 rounded-md border px-2 text-xs font-medium ${destructive
+      ? "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
       : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-  }`;
-  
+    }`;
+
   if (href) {
     return <Link href={href} className={className}><Icon className="size-3.5" />{label}</Link>;
   }
-  
+
   return <button onClick={onClick} className={className}><Icon className="size-3.5" />{label}</button>;
 }
 
@@ -205,7 +206,7 @@ function Dashboard({ docs = [] }: { docs?: any[] }) {
         <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm"><h2 className="font-semibold">กราฟจำนวนเอกสารรายเดือน</h2><div className="mt-4 flex h-48 items-end gap-3">{[45, 62, 58, 74, 88, 96, 82].map((h, i) => <div key={i} className="flex-1 rounded-t bg-teal-500" style={{ height: `${h}%` }} />)}</div></div>
         <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm"><h2 className="font-semibold">กราฟแยกตามหมวดหมู่เอกสาร</h2><div className="mt-4 space-y-3">{["บัญชีและการเงิน", "ภาษี", "บุคคล", "การดำเนินงาน", "จดทะเบียน"].map((name, i) => <div key={name}><div className="flex justify-between text-sm"><span>{name}</span><span>{[42, 26, 14, 12, 6][i]}%</span></div><div className="mt-1 h-2 rounded bg-slate-100"><div className="h-2 rounded bg-teal-500" style={{ width: `${[42, 26, 14, 12, 6][i]}%` }} /></div></div>)}</div></div>
       </div>
-      <div className="grid gap-5 lg:grid-cols-2"><div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm"><h2 className="font-semibold">เอกสารล่าสุด</h2><div className="mt-3 overflow-x-auto"><DocumentTable docs={docs.slice(0, 5)} onDelete={() => {}} /></div></div><Approvals compact /></div>
+      <div className="grid gap-5 lg:grid-cols-2"><div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm"><h2 className="font-semibold">เอกสารล่าสุด</h2><div className="mt-3 overflow-x-auto"><DocumentTable docs={docs.slice(0, 5)} onDelete={() => { }} /></div></div><Approvals compact /></div>
     </div>
   );
 }
@@ -215,7 +216,7 @@ function CreateDocument({ categories = [], documentTypes = [], companyId }: { ca
   const router = useRouter();
   const searchParams = useSearchParams();
   const editId = searchParams.get("edit");
-  
+
   const [formData, setFormData] = useState({
     title: "",
     documentNo: "",
@@ -248,14 +249,21 @@ function CreateDocument({ categories = [], documentTypes = [], companyId }: { ca
     e.preventDefault();
     if (!companyId) return alert("Company ID is required");
     startTransition(async () => {
+      let finalDataJson;
+      try {
+        finalDataJson = typeof formData.dataJson === "string" ? JSON.parse(formData.dataJson || "{}") : formData.dataJson;
+      } catch (e) {
+        finalDataJson = formData.dataJson;
+      }
+
       const payload = {
         title: formData.title,
         documentNo: formData.documentNo,
         categoryId: formData.categoryId || undefined,
         documentTypeId: formData.documentTypeId || undefined,
-        dataJson: JSON.parse(formData.dataJson || "{}"),
+        dataJson: finalDataJson,
       };
-      
+
       let res;
       try {
         if (editId) {
@@ -274,7 +282,7 @@ function CreateDocument({ categories = [], documentTypes = [], companyId }: { ca
       } catch (err: any) {
         res = { ok: false, error: err.message };
       }
-      
+
       if (res.ok) {
         window.location.href = "/th/documents";
       } else {
@@ -284,26 +292,26 @@ function CreateDocument({ categories = [], documentTypes = [], companyId }: { ca
   };
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[1fr_380px]">
-      <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="flex flex-col gap-6 mx-auto w-full max-w-[210mm]">
+      <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950">
         <h2 className="text-xl font-semibold mb-4">{editId ? "แก้ไขเอกสาร" : "สร้างเอกสารใหม่"}</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <label className="block">
             <span className="text-sm font-medium">ชื่อเอกสาร</span>
-            <input 
+            <input
               required
-              className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm" 
+              className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm dark:border-slate-700 dark:bg-slate-900"
               value={formData.title}
-              onChange={(e) => setFormData({...formData, title: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
             />
           </label>
           <label className="block">
             <span className="text-sm font-medium">หมวดหมู่</span>
-            <select 
+            <select
               required
-              className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm"
+              className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm dark:border-slate-700 dark:bg-slate-900"
               value={formData.categoryId}
-              onChange={(e) => setFormData({...formData, categoryId: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
             >
               <option value="">-- เลือกหมวดหมู่ --</option>
               {categories.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -311,28 +319,83 @@ function CreateDocument({ categories = [], documentTypes = [], companyId }: { ca
           </label>
           <label className="block">
             <span className="text-sm font-medium">ประเภทเอกสาร</span>
-            <select 
+            <select
               required
-              className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm"
+              className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm dark:border-slate-700 dark:bg-slate-900"
               value={formData.documentTypeId}
-              onChange={(e) => setFormData({...formData, documentTypeId: e.target.value})}
+              onChange={(e) => setFormData({ ...formData, documentTypeId: e.target.value })}
             >
               <option value="">-- เลือกประเภทเอกสาร --</option>
               {documentTypes.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
           </label>
-          <button type="submit" disabled={isPending} className="mt-4 w-full h-10 rounded-md bg-teal-600 text-white font-medium hover:bg-teal-700 disabled:opacity-50">
-            {isPending ? "กำลังบันทึก..." : "บันทึกเอกสาร"}
-          </button>
         </form>
       </div>
-      <DocumentPreview title={formData.title} documentNo={formData.documentNo} />
+      <div className="flex justify-center w-full">
+        {/* Render Tax Invoice component if selected */}
+        {documentTypes.find((t: any) => t.id === formData.documentTypeId)?.name?.includes("ใบกำกับภาษี") ? (
+          <TaxInvoiceTemplate
+            mode="edit"
+            data={typeof formData.dataJson === 'string' ? JSON.parse(formData.dataJson || "{}") : formData.dataJson}
+            onChange={(data) => setFormData({ ...formData, dataJson: data as any })}
+          />
+        ) : documentTypes.find((t: any) => t.id === formData.documentTypeId)?.name?.includes("ใบเสนอราคา") ? (
+          <QuotationTemplate
+            mode="edit"
+            data={typeof formData.dataJson === 'string' ? JSON.parse(formData.dataJson || "{}") : formData.dataJson}
+            onChange={(data) => setFormData({ ...formData, dataJson: data as any })}
+          />
+        ) : (
+          <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm w-full dark:border-slate-800 dark:bg-slate-950">
+            <h2 className="font-semibold mb-2">ข้อมูลเอกสารเพิ่มเติม (JSON)</h2>
+            <textarea
+              className="h-64 w-full rounded border border-slate-200 p-3 text-sm font-mono dark:border-slate-700 dark:bg-slate-900"
+              value={typeof formData.dataJson === 'string' ? formData.dataJson : JSON.stringify(formData.dataJson, null, 2)}
+              onChange={(e) => setFormData({ ...formData, dataJson: e.target.value })}
+            />
+          </div>
+        )}
+      </div>
+
+      <div className="flex justify-end gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+        <button type="button" onClick={() => window.location.href = "/th/documents"} className="px-4 py-2 text-sm font-medium border border-slate-300 rounded-md hover:bg-slate-50 text-slate-700 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">ยกเลิก</button>
+        <button type="button" onClick={handleSubmit} disabled={isPending} className="px-4 py-2 text-sm font-medium bg-teal-600 text-white rounded-md hover:bg-teal-700 disabled:opacity-50">
+          {isPending ? "กำลังบันทึก..." : "บันทึกเอกสาร"}
+        </button>
+      </div>
     </div>
   );
 }
 
-function DocumentPreview({ title, documentNo }: { title?: string; documentNo?: string }) {
-  return <aside className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm"><h2 className="font-semibold text-slate-950">Preview เอกสาร</h2><div className="mt-4 rounded-md bg-slate-100 p-4"><div className="min-h-[460px] rounded bg-white p-6 shadow"><p className="text-xl font-bold">{title || "ชื่อเอกสาร"}</p><p className="mt-2 text-sm text-slate-500">{documentNo || "DOC-XXXX"}</p><div className="mt-8 h-20 rounded border border-dashed border-slate-300" /><div className="mt-4 h-32 rounded border border-slate-200 bg-slate-50" /><p className="mt-8 text-right text-lg font-semibold">฿0.00</p></div></div></aside>;
+function DocumentPreview({ title, documentNo, dataJson, documentTypeName }: { title?: string; documentNo?: string; dataJson?: any; documentTypeName?: string }) {
+  return (
+    <aside className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="font-semibold text-slate-950 dark:text-white">Preview เอกสาร</h2>
+        <button onClick={() => window.print()} className="text-sm text-teal-600 hover:underline">พิมพ์ (Print)</button>
+      </div>
+
+      <div className="rounded-md bg-slate-100 p-4 overflow-x-auto dark:bg-slate-900 flex justify-center">
+        {documentTypeName?.includes("ใบกำกับภาษี") ? (
+          <div className="scale-75 origin-top-center">
+            <TaxInvoiceTemplate mode="view" data={typeof dataJson === 'string' ? JSON.parse(dataJson || "{}") : dataJson} />
+          </div>
+        ) : documentTypeName?.includes("ใบเสนอราคา") ? (
+          <div className="scale-75 origin-top-center">
+            <QuotationTemplate mode="view" data={typeof dataJson === 'string' ? JSON.parse(dataJson || "{}") : dataJson} />
+          </div>
+        ) : (
+          <div className="min-h-[460px] w-full max-w-[400px] rounded bg-white p-6 shadow dark:bg-slate-950">
+            <p className="text-xl font-bold">{title || "ชื่อเอกสาร"}</p>
+            <p className="mt-2 text-sm text-slate-500">{documentNo || "DOC-XXXX"}</p>
+            <div className="mt-8 h-20 rounded border border-dashed border-slate-300 dark:border-slate-700" />
+            <div className="mt-4 h-32 rounded border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900" />
+            <p className="mt-8 text-right text-lg font-semibold">฿0.00</p>
+          </div>
+        )}
+      </div>
+    </aside>
+  );
 }
 
 function DocumentDetail() {
@@ -344,7 +407,7 @@ function DocumentDetail() {
         <dl className="mt-5 grid gap-4 sm:grid-cols-2">{Object.entries({ "เลขเอกสาร": doc.id, "ชื่อเอกสาร": doc.name, "หมวดหมู่": doc.category, "ประเภท": doc.type, "สถานะ": doc.status, "ผู้สร้าง": doc.creator, "วันที่สร้าง": doc.created, "แก้ไขล่าสุด": doc.updated, "ไฟล์ PDF": `${doc.id}.pdf`, "ไฟล์แนบ": "contract.pdf, receipt.png" }).map(([k, v]) => <div key={k}><dt className="text-xs text-slate-500">{k}</dt><dd className="mt-1 font-medium text-slate-950">{v}</dd></div>)}</dl>
         <div className="mt-6 grid gap-4 sm:grid-cols-2"><Timeline title="ประวัติการอนุมัติ" items={["ACCOUNTANT approved", "FINANCE pending"]} /><Timeline title="ประวัติการแก้ไข" items={["สร้างเอกสาร", "แก้ไขยอดรวม", "แนบไฟล์ PDF"]} /></div>
       </div>
-      <DocumentPreview />
+      <DocumentPreview title={doc.name} documentNo={doc.id} documentTypeName={doc.type} />
     </div>
   );
 }
@@ -417,7 +480,7 @@ function DataTable({ headers, rows, actions }: { headers: string[]; rows: (strin
 
 export function CompanyWorkspace({ section, data, companyId }: { section: CompanySection; data?: any; companyId?: string }) {
   const meta = sectionMeta[section];
-  
+
   const [isPending, startTransition] = useTransition();
   const [documentToDelete, setDocumentToDelete] = useState<string | null>(null);
 
@@ -445,12 +508,12 @@ export function CompanyWorkspace({ section, data, companyId }: { section: Compan
         {section === "dashboard" && <Dashboard docs={data?.documents || []} />}
         {section === "documents" && (
           <>
-            <Toolbar 
-              placeholder="ค้นหาเลขเอกสารหรือชื่อเอกสาร" 
-              filters={["หมวดหมู่", "ประเภทเอกสาร", "สถานะ", "วันที่"]} 
+            <Toolbar
+              placeholder="ค้นหาเลขเอกสารหรือชื่อเอกสาร"
+              filters={["หมวดหมู่", "ประเภทเอกสาร", "สถานะ", "วันที่"]}
               actions={[
-                { label: "เพิ่มเอกสาร", href: "/th/documents/create" }, 
-              ]} 
+                { label: "เพิ่มเอกสาร", href: "/th/documents/create" },
+              ]}
             />
             <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
               <DocumentTable docs={data?.documents || []} onDelete={setDocumentToDelete} />

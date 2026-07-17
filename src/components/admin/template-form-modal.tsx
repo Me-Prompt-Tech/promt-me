@@ -59,8 +59,7 @@ export function TemplateFormModal({
     }
   }, [open, initialData]);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = () => {
     startTransition(async () => {
       let res;
       try {
@@ -100,8 +99,9 @@ export function TemplateFormModal({
       title={initialData ? "แก้ไข Template" : "เพิ่ม Template ใหม่"}
       description={initialData ? "แก้ไขข้อมูล Template กลาง" : "เพิ่ม Template กลาง สำหรับให้ทุกบริษัทใช้งาน"}
       onClose={onClose}
+      onSubmit={isPending ? undefined : handleSubmit}
     >
-      <form id="template-form" onSubmit={handleSubmit} className="space-y-4">
+      <div className="space-y-4">
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
             ชื่อ Template <span className="text-rose-500">*</span>
@@ -177,24 +177,7 @@ export function TemplateFormModal({
             placeholder="อธิบายรายละเอียดการใช้งาน Template นี้"
           />
         </div>
-
-        <div className="flex justify-end gap-3 pt-4">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
-          >
-            ยกเลิก
-          </button>
-          <button
-            type="submit"
-            disabled={isPending}
-            className="rounded-md bg-teal-600 px-4 py-2 text-sm font-medium text-white hover:bg-teal-700 disabled:opacity-50"
-          >
-            {isPending ? "กำลังบันทึก..." : "บันทึกข้อมูล"}
-          </button>
-        </div>
-      </form>
+      </div>
     </FormModal>
   );
 }
