@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, Building2, ChevronRight, Moon, Search, Sun, UserRound } from "lucide-react";
+import { Bell, Building2, ChevronRight, Menu, Moon, Search, Sun, UserRound } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -25,7 +25,7 @@ const labels: Record<string, string> = {
   users: "ผู้ใช้บริษัท",
 };
 
-export function CompanyShellControls({ userName }: { userName?: string | null }) {
+export function CompanyShellControls({ userName, onMenuClick }: { userName?: string | null; onMenuClick?: () => void }) {
   const pathname = usePathname();
   const [isDark, setIsDark] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -47,6 +47,15 @@ export function CompanyShellControls({ userName }: { userName?: string | null })
       <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
         <div className="min-w-0">
           <nav className="flex flex-wrap items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400">
+            {onMenuClick && (
+              <button 
+                onClick={onMenuClick} 
+                className="mr-1 lg:hidden rounded p-1 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors"
+                title="Open menu"
+              >
+                <Menu className="size-5" />
+              </button>
+            )}
             {breadcrumbs.map((item, index) => (
               <span key={`${item}-${index}`} className="inline-flex items-center gap-1">
                 {index > 0 && <ChevronRight className="size-3" />}

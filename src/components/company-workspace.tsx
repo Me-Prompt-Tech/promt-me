@@ -22,6 +22,7 @@ import { ConfirmDialog } from "@/components/ui/app-components";
 import { DocumentDesigner } from "@/components/document-designer";
 import { TaxInvoiceTemplate } from "@/components/templates/tax-invoice";
 import { QuotationTemplate } from "@/components/templates/quotation";
+import { CompanyAffidavitTemplate } from "@/components/templates/company-affidavit";
 
 export type CompanySection =
   | "dashboard"
@@ -311,7 +312,10 @@ function CreateDocument({ categories = [], documentTypes = [], companyId }: { ca
               required
               className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm dark:border-slate-700 dark:bg-slate-900"
               value={formData.categoryId}
-              onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
+              onChange={(e) => {
+                const newCategoryId = e.target.value;
+                setFormData({ ...formData, categoryId: newCategoryId, documentTypeId: "" });
+              }}
             >
               <option value="">-- เลือกหมวดหมู่ --</option>
               {categories.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -324,15 +328,20 @@ function CreateDocument({ categories = [], documentTypes = [], companyId }: { ca
               className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm dark:border-slate-700 dark:bg-slate-900"
               value={formData.documentTypeId}
               onChange={(e) => setFormData({ ...formData, documentTypeId: e.target.value })}
+              disabled={!formData.categoryId}
             >
               <option value="">-- เลือกประเภทเอกสาร --</option>
-              {documentTypes.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              {documentTypes
+                .filter((t: any) => !formData.categoryId || t.categoryId === formData.categoryId)
+                .map((t: any) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
             </select>
           </label>
         </form>
       </div>
       <div className="flex justify-center w-full">
-        {/* Render Tax Invoice component if selected */}
+        {/* Render Document templates if selected */}
         {documentTypes.find((t: any) => t.id === formData.documentTypeId)?.name?.includes("ใบกำกับภาษี") ? (
           <TaxInvoiceTemplate
             mode="edit"
@@ -341,6 +350,12 @@ function CreateDocument({ categories = [], documentTypes = [], companyId }: { ca
           />
         ) : documentTypes.find((t: any) => t.id === formData.documentTypeId)?.name?.includes("ใบเสนอราคา") ? (
           <QuotationTemplate
+            mode="edit"
+            data={typeof formData.dataJson === 'string' ? JSON.parse(formData.dataJson || "{}") : formData.dataJson}
+            onChange={(data) => setFormData({ ...formData, dataJson: data as any })}
+          />
+        ) : documentTypes.find((t: any) => t.id === formData.documentTypeId)?.name?.includes("หนังสือรับรอง") || documentTypes.find((t: any) => t.id === formData.documentTypeId)?.name?.includes("จดทะเบียน") ? (
+          <CompanyAffidavitTemplate
             mode="edit"
             data={typeof formData.dataJson === 'string' ? JSON.parse(formData.dataJson || "{}") : formData.dataJson}
             onChange={(data) => setFormData({ ...formData, dataJson: data as any })}
@@ -383,6 +398,10 @@ function DocumentPreview({ title, documentNo, dataJson, documentTypeName }: { ti
         ) : documentTypeName?.includes("ใบเสนอราคา") ? (
           <div className="scale-75 origin-top-center">
             <QuotationTemplate mode="view" data={typeof dataJson === 'string' ? JSON.parse(dataJson || "{}") : dataJson} />
+          </div>
+        ) : documentTypeName?.includes("หนังสือรับรอง") || documentTypeName?.includes("จดทะเบียน") ? (
+          <div className="scale-75 origin-top-center">
+            <CompanyAffidavitTemplate mode="view" data={typeof dataJson === 'string' ? JSON.parse(dataJson || "{}") : dataJson} />
           </div>
         ) : (
           <div className="min-h-[460px] w-full max-w-[400px] rounded bg-white p-6 shadow dark:bg-slate-950">

@@ -538,6 +538,20 @@ function CategoryCards({
             </div>
             <StatusBadge value={category.isActive ? "ACTIVE" : "INACTIVE"} />
           </div>
+          
+          {category.types && category.types.length > 0 && (
+            <div className="mt-4 border-t border-slate-100 pt-3 dark:border-slate-800/50">
+              <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">ประเภทเอกสาร</p>
+              <div className="flex flex-wrap gap-1.5">
+                {category.types.map((t: any) => (
+                  <span key={t.id} className="inline-flex items-center rounded bg-slate-50 px-2 py-1 text-xs font-medium text-slate-600 border border-slate-200/60 dark:bg-slate-900/50 dark:text-slate-300 dark:border-slate-800">
+                    {t.name}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="mt-4 flex flex-wrap gap-1.5">
             <IconButton label="แก้ไข" onClick={() => onEdit(category)} />
             <IconButton label={category.isActive ? "ปิดใช้งาน" : "เปิดใช้งาน"} onClick={() => onToggleStatus(category.id, category.isActive)} />

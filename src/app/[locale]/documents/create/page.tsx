@@ -11,8 +11,8 @@ export default async function CreateDocumentPage() {
     dbList("document-types", { isGlobal: true })
   ]);
   
-  const categories = catRes.ok ? catRes.data : [];
-  const documentTypes = typeRes.ok ? typeRes.data : [];
+  const categories = (catRes.ok ? catRes.data : []).sort((a: any, b: any) => (a.showOrder || 0) - (b.showOrder || 0));
+  const documentTypes = (typeRes.ok ? typeRes.data : []).sort((a: any, b: any) => (a.showOrder || 0) - (b.showOrder || 0));
 
   return <CompanyWorkspace section="document-create" data={{ categories, documentTypes }} companyId={companyId} />;
 }
