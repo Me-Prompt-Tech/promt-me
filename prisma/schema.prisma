@@ -1,10 +1,11 @@
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider   = "prisma-client-js"
+  engineType = "library"
 }
 
 datasource db {
   provider = "mongodb"
+  url      = env("DATABASE_URL")
 }
 
 /**
@@ -143,16 +144,16 @@ model SystemAdmin {
  */
 
 model Plan {
-  id          String     @id @default(auto()) @map("_id") @db.ObjectId
+  id          String  @id @default(auto()) @map("_id") @db.ObjectId
   name        String
   description String?
 
-  priceSatang Int       @default(0)
-  maxUsers    Int?
+  priceSatang  Int  @default(0)
+  maxUsers     Int?
   maxDocuments Int?
   maxStorageMb Int?
 
-  status      PlanStatus @default(ACTIVE)
+  status PlanStatus @default(ACTIVE)
 
   companies     Company[]
   subscriptions Subscription[]
@@ -162,9 +163,9 @@ model Plan {
 }
 
 model Subscription {
-  id        String @id @default(auto()) @map("_id") @db.ObjectId
+  id String @id @default(auto()) @map("_id") @db.ObjectId
 
-  companyId String @db.ObjectId
+  companyId String  @db.ObjectId
   company   Company @relation(fields: [companyId], references: [id])
 
   planId String @db.ObjectId
@@ -189,10 +190,10 @@ model Subscription {
  */
 
 model Company {
-  id        String        @id @default(auto()) @map("_id") @db.ObjectId
-  name      String
-  legalName String?
-  taxId     String?
+  id         String  @id @default(auto()) @map("_id") @db.ObjectId
+  name       String
+  legalName  String?
+  taxId      String?
   branchCode String?
 
   email   String?
@@ -200,7 +201,7 @@ model Company {
   address String?
   logoUrl String?
 
-  status  CompanyStatus @default(ACTIVE)
+  status CompanyStatus @default(ACTIVE)
 
   planId String? @db.ObjectId
   plan   Plan?   @relation(fields: [planId], references: [id])
@@ -509,9 +510,9 @@ model Document {
   vatSatang      Int?
   totalSatang    Int?
 
-  pdfUrl      String?
-  previewUrl  String?
-  note        String?
+  pdfUrl     String?
+  previewUrl String?
+  note       String?
 
   currentApprovalStep Int?
   rejectedReason      String?
@@ -524,8 +525,8 @@ model Document {
   approvedById String?      @db.ObjectId
   approvedBy   CompanyUser? @relation("DocumentApprovedBy", fields: [approvedById], references: [id])
 
-  approvedAt DateTime?
-  rejectedAt DateTime?
+  approvedAt  DateTime?
+  rejectedAt  DateTime?
   cancelledAt DateTime?
 
   files     DocumentFile[]
@@ -625,11 +626,11 @@ model Employee {
   departmentId String?     @db.ObjectId
   department   Department? @relation(fields: [departmentId], references: [id])
 
-  code       String?
-  name       String
-  email      String?
-  phone      String?
-  position   String?
+  code         String?
+  name         String
+  email        String?
+  phone        String?
+  position     String?
   salarySatang Int?
 
   startDate DateTime?
@@ -783,9 +784,9 @@ model AuditLog {
   actorAdminId String?      @db.ObjectId
   actorAdmin   SystemAdmin? @relation("AdminAuditLogs", fields: [actorAdminId], references: [id])
 
-  action   String
-  module   String
-  detail   Json?
+  action    String
+  module    String
+  detail    Json?
   ipAddress String?
   userAgent String?
 

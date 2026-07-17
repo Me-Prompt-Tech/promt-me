@@ -1,6 +1,8 @@
 import { auth } from "@/auth";
 import { createPdfExport } from "@/lib/pdf-export";
 import type { PdfExportInput } from "@/lib/pdf-export";
+import { prisma } from "@/lib/prisma";
+import type { PdfExportInput } from "@/lib/pdf-export";
 import {
   ApiError,
   apiErrorPayload,
@@ -65,10 +67,20 @@ function handleApiError(errorValue: unknown) {
     return json(apiErrorPayload(errorValue), errorValue.status);
   }
 
+  if (typeof errorValue === "object" && errorValue !== null && "code" in errorValue && (errorValue as any).code === "P2002") {
+    return json({
+      ok: false,
+      code: "VALIDATION_ERROR",
+      message: "มีข้อมูลนี้อยู่ในระบบแล้ว (ข้อมูลซ้ำซ้อน)",
+      error: (errorValue as Error).message,
+    }, 400);
+  }
+
   return json({
     ok: false,
     code: "BAD_REQUEST",
     message: "เกิดข้อผิดพลาดในการทำรายการ",
+    error: errorValue instanceof Error ? errorValue.message : "Unknown error",
   }, 500);
 }
 
@@ -168,60 +180,65 @@ function pdfBody(input: unknown): Partial<PdfExportInput> {
   return input as Partial<PdfExportInput>;
 }
 
-function mockList(resource: string, companyId?: string) {
-  return {
-    ok: true,
-    resource,
-    tenant: companyId ? { companyId, where: { companyId } } : null,
-    data: [
-      {
-        id: `${resource}_1`,
-        name: `${resource} sample 1`,
-        status: "ACTIVE",
-        companyId,
-      },
-      {
-        id: `${resource}_2`,
-        name: `${resource} sample 2`,
-        status: "DRAFT",
-        companyId,
-      },
-    ],
-  };
+const modelMap: Record<string, any> = {
+  "companies": "company",
+  "company-users": "companyUser",
+  "plans": "plan",
+  "document-categories": "documentCategory",
+  "document-types": "documentType",
+  "templates": "documentTemplate",
+  "audit-logs": "auditLog",
+  "documents": "document",
+  "business-partners": "businessPartner",
+  "employees": "employee",
+  "departments": "department",
+  "approval-flows": "approvalFlow",
+  "approvals": "documentApproval",
+  "document-number-settings": "documentNumberSetting",
+  "template-fields": "templateField"
+};
+
+function getPrismaModel(resource: string) {
+  const modelName = modelMap[resource];
+  if (!modelName) throw new ApiError("ROUTE_NOT_FOUND", `No model for resource ${resource}`, 404);
+  // @ts-ignore
+  return prisma[modelName];
 }
 
-function mockDetail(resource: string, id: string, companyId?: string) {
-  return {
-    ok: true,
-    resource,
-    tenant: companyId ? { companyId, where: { companyId, id } } : null,
-    data: {
-      id,
-      name: `${resource} detail`,
-      status: "ACTIVE",
-      companyId,
-    },
-  };
+export async function dbList(resource: string, whereClause: any = {}) {
+  const model = getPrismaModel(resource);
+  // Use createdAt desc if possible, otherwise it just returns data
+  const data = await model.findMany({ where: whereClause, orderBy: { createdAt: "desc" } });
+  return { ok: true, resource, data };
 }
 
-function mutationResponse(
-  action: string,
-  resource: string,
-  body: unknown,
-  id?: string,
-  companyId?: string
-) {
-  return {
-    ok: true,
-    action,
-    resource,
-    tenant: companyId ? { companyId, where: id ? { companyId, id } : { companyId } } : null,
-    data: {
-      id: id ?? `${resource}_new`,
-      ...((body && typeof body === "object") ? body : {}),
-      companyId,
-    },
-  };
+export async function dbDetail(resource: string, whereClause: any = {}) {
+  const model = getPrismaModel(resource);
+  const data = await model.findFirst({ where: whereClause });
+  if (!data) throw new ApiError("NOT_FOUND", "ไม่พบข้อมูล", 404);
+  return { ok: true, resource, data };
+}
+
+export async function dbCreate(resource: string, dataPayload: any) {
+  const model = getPrismaModel(resource);
+  const data = await model.create({ data: dataPayload });
+  return { ok: true, action: "create", resource, data };
+}
+
+export async function dbUpdate(resource: string, whereClause: any, dataPayload: any) {
+  const model = getPrismaModel(resource);
+  const existing = await model.findFirst({ where: whereClause });
+  if (!existing) throw new ApiError("NOT_FOUND", "ไม่พบข้อมูล", 404);
+  const data = await model.update({ where: { id: existing.id }, data: dataPayload });
+  return { ok: true, action: "update", resource, data };
+}
+
+export async function dbDelete(resource: string, whereClause: any) {
+  const model = getPrismaModel(resource);
+  const existing = await model.findFirst({ where: whereClause });
+  if (!existing) throw new ApiError("NOT_FOUND", "ไม่พบข้อมูล", 404);
+  await model.delete({ where: { id: existing.id } });
+  return { ok: true, action: "delete", resource, id: existing.id };
 }
 
 async function validatedBody(request: NextRequest, resource: string) {
@@ -270,36 +287,32 @@ export async function handleAdminApi(request: NextRequest, context: RouteContext
     }
 
     if (resource === "audit-logs" && request.method === "GET") {
-      return json(mockList(resource));
+      return json(await dbList(resource));
     }
 
     if (id && action === "status" && request.method === "PATCH") {
-      assertFound(id);
-      return json(mutationResponse("status", resource, validate(statusUpdateSchema, await readBody(request)), id));
+      return json(await dbUpdate(resource, { id }, validate(statusUpdateSchema, await readBody(request))));
     }
 
     if (!id && request.method === "GET") {
-      return json(mockList(resource));
+      return json(await dbList(resource));
     }
 
     if (!id && request.method === "POST") {
-      return json(mutationResponse("create", resource, await validatedBody(request, resource)), 201);
+      return json(await dbCreate(resource, await validatedBody(request, resource)), 201);
     }
 
     if (id && !action && request.method === "GET") {
-      assertFound(id);
-      return json(mockDetail(resource, id));
+      return json(await dbDetail(resource, { id }));
     }
 
     if (id && !action && request.method === "PUT") {
-      assertFound(id);
-      return json(mutationResponse("update", resource, await validatedBody(request, resource), id));
+      return json(await dbUpdate(resource, { id }, await validatedBody(request, resource)));
     }
 
     if (id && !action && request.method === "DELETE") {
-      assertFound(id);
       assertCanDelete(resource, id);
-      return json({ ok: true, action: "delete", resource, id });
+      return json(await dbDelete(resource, { id }));
     }
 
     return error("Method or route not allowed", 405, "METHOD_NOT_ALLOWED");
@@ -382,20 +395,19 @@ export async function handleCompanyApi(request: NextRequest, context: RouteConte
         ok: true,
         report: reportName,
         tenant: { companyId, where: { companyId } },
-        data: mockList(`reports/${reportName}`, companyId).data,
+        data: [],
       });
     }
     return error("Report route not found", 404, "ROUTE_NOT_FOUND");
   }
 
   if (resource === "approvals" && id && ["approve", "reject"].includes(action ?? "") && request.method === "POST") {
-    assertFound(id);
-    return json(mutationResponse(action!, resource, validate(approvalActionSchema, await readBody(request)), id, companyId));
+    const actionData = validate(approvalActionSchema, await readBody(request));
+    return json(await dbUpdate(resource, { id, companyId }, actionData));
   }
 
   if (resource === "templates" && id && action === "designer" && request.method === "PUT") {
-    assertFound(id);
-    return json(mutationResponse("save-designer", resource, await readBody(request), id, companyId));
+    return json(await dbUpdate(resource, { id, companyId }, await readBody(request)));
   }
 
   if (resource === "templates" && id && ["export-pdf", "export-preview-pdf"].includes(action ?? "") && request.method === "POST") {
@@ -426,19 +438,19 @@ export async function handleCompanyApi(request: NextRequest, context: RouteConte
 
   if (resource === "templates" && id && action === "fields") {
     if (request.method === "GET") {
-      return json(mockList("template-fields", companyId));
+      return json(await dbList("template-fields", { templateId: id, companyId }));
     }
     if (request.method === "POST") {
-      return json(mutationResponse("create-field", "template-fields", validate(templateFieldSchema, await readBody(request)), undefined, companyId), 201);
+      const body = validate(templateFieldSchema, await readBody(request));
+      return json(await dbCreate("template-fields", { ...(body as object), templateId: id, companyId }), 201);
     }
     if (nestedId && request.method === "PUT") {
-      assertFound(nestedId);
-      return json(mutationResponse("update-field", "template-fields", validate(templateFieldSchema, await readBody(request)), nestedId, companyId));
+      const body = validate(templateFieldSchema, await readBody(request));
+      return json(await dbUpdate("template-fields", { id: nestedId, templateId: id, companyId }, body));
     }
     if (nestedId && request.method === "DELETE") {
-      assertFound(nestedId);
       assertCanDelete("template-fields", nestedId);
-      return json({ ok: true, action: "delete-field", resource: "template-fields", id: nestedId, tenant: { companyId } });
+      return json(await dbDelete("template-fields", { id: nestedId, templateId: id, companyId }));
     }
   }
 
@@ -478,8 +490,7 @@ export async function handleCompanyApi(request: NextRequest, context: RouteConte
         });
       }
 
-      assertFound(id);
-      return json(mutationResponse(action, resource, await readBody(request), id, companyId));
+      return json(await dbUpdate(resource, { id, companyId }, await readBody(request)));
     }
   }
 
@@ -487,28 +498,38 @@ export async function handleCompanyApi(request: NextRequest, context: RouteConte
     return error("Action route not found", 404, "ROUTE_NOT_FOUND");
   }
 
+  const getCompanyWhere = (resourceName: string, targetId?: string) => {
+    let where: any = {};
+    if (targetId) where.id = targetId;
+    if (["document-categories", "document-types", "templates"].includes(resourceName)) {
+      where.OR = [{ companyId }, { isGlobal: true }];
+    } else {
+      where.companyId = companyId;
+    }
+    return where;
+  };
+
   if (!id && request.method === "GET") {
-    return json(mockList(resource, companyId));
+    return json(await dbList(resource, getCompanyWhere(resource)));
   }
 
   if (!id && request.method === "POST") {
-    return json(mutationResponse("create", resource, await validatedBody(request, resource), undefined, companyId), 201);
+    const body = await validatedBody(request, resource);
+    return json(await dbCreate(resource, { ...(body as object), companyId }), 201);
   }
 
   if (id && !action && request.method === "GET") {
-    assertFound(id);
-    return json(mockDetail(resource, id, companyId));
+    return json(await dbDetail(resource, getCompanyWhere(resource, id)));
   }
 
   if (id && !action && request.method === "PUT") {
-    assertFound(id);
-    return json(mutationResponse("update", resource, await validatedBody(request, resource), id, companyId));
+    const body = await validatedBody(request, resource);
+    return json(await dbUpdate(resource, { id, companyId }, body));
   }
 
   if (id && !action && request.method === "DELETE") {
-    assertFound(id);
     assertCanDelete(resource, id);
-    return json({ ok: true, action: "delete", resource, id, tenant: { companyId, where: { companyId, id } } });
+    return json(await dbDelete(resource, { id, companyId }));
   }
 
   return error("Method or route not allowed", 405, "METHOD_NOT_ALLOWED");

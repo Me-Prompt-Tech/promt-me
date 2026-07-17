@@ -1,3 +1,11 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import { CategoryFormModal, type CategoryData } from "@/components/admin/category-form-modal";
+import { TypeFormModal, type DocumentTypeData } from "@/components/admin/type-form-modal";
+import { TemplateFormModal, type TemplateData } from "@/components/admin/template-form-modal";
+import { ConfirmDialog } from "@/components/ui/app-components";
+
 import {
   Activity,
   Building2,
@@ -150,16 +158,7 @@ const documentCategories = [
   },
 ];
 
-const documentTypes = [
-  { code: "QT", name: "ใบเสนอราคา", category: "เอกสารด้านบัญชีและการเงิน", order: 1, status: "ACTIVE" },
-  { code: "INV", name: "ใบแจ้งหนี้", category: "เอกสารด้านบัญชีและการเงิน", order: 2, status: "ACTIVE" },
-  { code: "REC", name: "ใบเสร็จรับเงิน", category: "เอกสารด้านบัญชีและการเงิน", order: 3, status: "ACTIVE" },
-  { code: "TAX", name: "ใบกำกับภาษี", category: "เอกสารภาษี", order: 4, status: "ACTIVE" },
-  { code: "EMP", name: "สัญญาจ้างงาน", category: "เอกสารบุคคล", order: 5, status: "ACTIVE" },
-  { code: "LEAVE", name: "ใบลา", category: "เอกสารบุคคล", order: 6, status: "ACTIVE" },
-  { code: "MOM", name: "รายงานการประชุม", category: "เอกสารการดำเนินงาน", order: 7, status: "ACTIVE" },
-  { code: "CHK", name: "Checklist งาน", category: "เอกสารการดำเนินงาน", order: 8, status: "ACTIVE" },
-];
+
 
 const templates = [
   { name: "ใบเสนอราคา Standard", category: "เอกสารด้านบัญชีและการเงิน", type: "ใบเสนอราคา", global: "Yes", mode: "Designer", status: "ACTIVE" },
@@ -214,7 +213,7 @@ function StatusBadge({ value }: { value: string }) {
   return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${color}`}>{value}</span>;
 }
 
-function IconButton({ label, destructive = false }: { label: string; destructive?: boolean }) {
+function IconButton({ label, destructive = false, onClick }: { label: string; destructive?: boolean; onClick?: () => void }) {
   const Icon = label.includes("ลบ")
     ? Trash2
     : label.includes("แก้")
@@ -229,11 +228,11 @@ function IconButton({ label, destructive = false }: { label: string; destructive
 
   return (
     <button
-      className={`inline-flex h-8 items-center gap-1.5 rounded-md border px-2 text-xs font-medium ${
-        destructive
-          ? "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
-          : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
-      }`}
+      onClick={onClick}
+      className={`inline-flex h-8 items-center gap-1.5 rounded-md border px-2 text-xs font-medium ${destructive
+        ? "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
+        : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200 dark:hover:bg-slate-900"
+        }`}
     >
       <Icon className="size-3.5" />
       {label}
@@ -241,7 +240,7 @@ function IconButton({ label, destructive = false }: { label: string; destructive
   );
 }
 
-function PageHeader({ section }: { section: AdminSection }) {
+function PageHeader({ section, onAdd }: { section: AdminSection; onAdd?: () => void }) {
   const meta = sectionTitles[section];
 
   return (
@@ -257,10 +256,20 @@ function PageHeader({ section }: { section: AdminSection }) {
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-400">{meta.description}</p>
           </div>
         </div>
-        <button className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-teal-600 px-4 text-sm font-semibold text-white shadow-sm hover:bg-teal-700">
-          <Plus className="size-4" />
-          เพิ่มข้อมูล
-        </button>
+        {onAdd ? (
+          <button
+            onClick={onAdd}
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-teal-600 px-4 text-sm font-semibold text-white shadow-sm hover:bg-teal-700"
+          >
+            <Plus className="size-4" />
+            เพิ่มข้อมูล
+          </button>
+        ) : (
+          <button className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-teal-600 px-4 text-sm font-semibold text-white shadow-sm hover:bg-teal-700">
+            <Plus className="size-4" />
+            เพิ่มข้อมูล
+          </button>
+        )}
       </div>
     </div>
   );
@@ -300,12 +309,17 @@ function SearchToolbar({
   );
 }
 
-function ActionBar({ items }: { items: string[] }) {
+export type ActionItem = string | { label: string; onClick?: () => void; destructive?: boolean };
+
+function ActionBar({ items }: { items: ActionItem[] }) {
   return (
     <div className="flex flex-wrap gap-2 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950">
-      {items.map((item) => (
-        <IconButton key={item} label={item} destructive={item.includes("ลบ")} />
-      ))}
+      {items.map((item, i) => {
+        if (typeof item === "string") {
+          return <IconButton key={item} label={item} destructive={item.includes("ลบ")} />;
+        }
+        return <IconButton key={i} label={item.label} destructive={item.destructive} onClick={item.onClick} />;
+      })}
     </div>
   );
 }
@@ -319,7 +333,7 @@ function DataShell({
   children: React.ReactNode;
   placeholder: string;
   filters?: string[];
-  actions: string[];
+  actions: ActionItem[];
 }) {
   return (
     <div className="space-y-4">
@@ -499,34 +513,53 @@ function PlanCards() {
   );
 }
 
-function CategoryCards() {
+function CategoryCards({
+  categories,
+  onEdit,
+  onDelete,
+  onToggleStatus
+}: {
+  categories: any[];
+  onEdit: (cat: any) => void;
+  onDelete: (id: string) => void;
+  onToggleStatus: (id: string, current: boolean) => void;
+}) {
   return (
     <div className="grid gap-3 md:grid-cols-2">
-      {documentCategories.map((category) => (
-        <div key={category.slug} className="rounded-lg border border-slate-200 p-4 dark:border-slate-800">
+      {categories.map((category) => (
+        <div key={category.id} className="rounded-lg border border-slate-200 p-4 dark:border-slate-800">
           <div className="flex items-start justify-between gap-3">
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-900 dark:text-slate-200">#{category.order}</span>
+                <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-900 dark:text-slate-200">#{category.showOrder}</span>
                 <h2 className="font-semibold text-slate-950 dark:text-white">{category.name}</h2>
               </div>
-              <p className="mt-2 text-xs text-slate-500">slug: {category.slug} · icon: {category.icon}</p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {category.examples.map((example) => (
-                  <span key={example} className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700 dark:bg-slate-900 dark:text-slate-200">{example}</span>
-                ))}
-              </div>
+              <p className="mt-2 text-xs text-slate-500">slug: {category.slug} · icon: {category.icon || "none"}</p>
             </div>
-            <StatusBadge value={category.status} />
+            <StatusBadge value={category.isActive ? "ACTIVE" : "INACTIVE"} />
           </div>
-          <div className="mt-4 flex flex-wrap gap-1.5">{["แก้ไข", "ลบ", "เปิด/ปิด", "เรียงลำดับ"].map((item) => <IconButton key={item} label={item} destructive={item === "ลบ"} />)}</div>
+          <div className="mt-4 flex flex-wrap gap-1.5">
+            <IconButton label="แก้ไข" onClick={() => onEdit(category)} />
+            <IconButton label={category.isActive ? "ปิดใช้งาน" : "เปิดใช้งาน"} onClick={() => onToggleStatus(category.id, category.isActive)} />
+            <IconButton label="ลบ" destructive onClick={() => onDelete(category.id)} />
+          </div>
         </div>
       ))}
     </div>
   );
 }
 
-function DocumentTypesTable() {
+function DocumentTypesTable({
+  types,
+  onEdit,
+  onDelete,
+  onToggleStatus
+}: {
+  types: any[];
+  onEdit: (type: any) => void;
+  onDelete: (id: string) => void;
+  onToggleStatus: (id: string, current: boolean) => void;
+}) {
   return (
     <table className="w-full min-w-[760px] text-left text-sm">
       <thead className="text-xs uppercase text-slate-500">
@@ -540,37 +573,66 @@ function DocumentTypesTable() {
         </tr>
       </thead>
       <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-        {documentTypes.map((type) => (
-          <tr key={type.code}>
-            <td className="py-4 pr-4 text-slate-600 dark:text-slate-300">{type.order}</td>
-            <td className="py-4 pr-4 font-semibold text-slate-950 dark:text-white">{type.code}</td>
+        {types.map((type) => (
+          <tr key={type.id}>
+            <td className="py-4 pr-4 text-slate-600 dark:text-slate-300">{type.showOrder}</td>
+            <td className="py-4 pr-4 font-semibold text-slate-950 dark:text-white">{type.slug}</td>
             <td className="py-4 pr-4 text-slate-700 dark:text-slate-200">{type.name}</td>
-            <td className="py-4 pr-4 text-slate-600 dark:text-slate-300">{type.category}</td>
-            <td className="py-4 pr-4"><StatusBadge value={type.status} /></td>
-            <td className="py-4"><div className="flex flex-wrap gap-1.5">{["แก้ไข", "ลบ", "เปิด/ปิด", "เรียงลำดับ"].map((item) => <IconButton key={item} label={item} destructive={item === "ลบ"} />)}</div></td>
+            <td className="py-4 pr-4 text-slate-600 dark:text-slate-300">{type.category?.name}</td>
+            <td className="py-4 pr-4"><StatusBadge value={type.isActive ? "ACTIVE" : "INACTIVE"} /></td>
+            <td className="py-4">
+              <div className="flex flex-wrap gap-1.5">
+                <IconButton label="แก้ไข" onClick={() => onEdit(type)} />
+                <IconButton label={type.isActive ? "ปิดใช้งาน" : "เปิดใช้งาน"} onClick={() => onToggleStatus(type.id, type.isActive)} />
+                <IconButton label="ลบ" destructive onClick={() => onDelete(type.id)} />
+              </div>
+            </td>
           </tr>
         ))}
+        {types.length === 0 && (
+          <tr>
+            <td colSpan={6} className="py-8 text-center text-slate-500">ไม่มีข้อมูลประเภทเอกสาร</td>
+          </tr>
+        )}
       </tbody>
     </table>
   );
 }
 
-function TemplateGrid() {
+function TemplateGrid({
+  templates,
+  onEdit,
+  onDelete,
+  onToggleStatus
+}: {
+  templates: any[];
+  onEdit: (template: any) => void;
+  onDelete: (id: string) => void;
+  onToggleStatus: (id: string, current: boolean) => void;
+}) {
   return (
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
       {templates.map((template) => (
-        <div key={template.name} className="rounded-lg border border-slate-200 p-5 dark:border-slate-800">
+        <div key={template.id} className="rounded-lg border border-slate-200 p-5 dark:border-slate-800">
           <LayoutTemplate className="size-5 text-teal-700 dark:text-teal-300" />
           <h2 className="mt-4 font-semibold text-slate-950 dark:text-white">{template.name}</h2>
-          <p className="mt-1 text-sm text-slate-500">{template.category}</p>
-          <p className="text-sm text-slate-500">{template.type} · {template.mode}</p>
+          <p className="mt-1 text-sm text-slate-500">{template.category?.name || "ไม่ระบุหมวดหมู่"}</p>
+          <p className="text-sm text-slate-500">{template.documentType?.name || "ไม่ระบุประเภท"} · {template.templateMode}</p>
           <div className="mt-4 flex items-center justify-between gap-3">
-            <StatusBadge value={template.status} />
-            <StatusBadge value={template.global} />
+            <StatusBadge value={template.isActive ? "ACTIVE" : "INACTIVE"} />
+            <StatusBadge value={template.isGlobal ? "Yes" : "No"} />
           </div>
-          <div className="mt-4 flex flex-wrap gap-1.5">{["แก้ไข", "ลบ", "Duplicate", "Preview", "Designer"].map((item) => <IconButton key={item} label={item} destructive={item === "ลบ"} />)}</div>
+          <div className="mt-4 flex flex-wrap gap-1.5">
+            <IconButton label="แก้ไข" onClick={() => onEdit(template)} />
+            <IconButton label={template.isActive ? "ปิดใช้งาน" : "เปิดใช้งาน"} onClick={() => onToggleStatus(template.id, template.isActive)} />
+            <IconButton label="ลบ" destructive onClick={() => onDelete(template.id)} />
+            <IconButton label="Designer" onClick={() => window.open(`/th/admin/templates/${template.id}/designer`, '_blank')} />
+          </div>
         </div>
       ))}
+      {templates.length === 0 && (
+        <div className="col-span-full py-8 text-center text-slate-500">ไม่มีข้อมูล Template กลาง</div>
+      )}
     </div>
   );
 }
@@ -628,10 +690,177 @@ function AuditTable() {
   );
 }
 
-export function SystemAdminWorkspace({ section }: { section: AdminSection }) {
+export function SystemAdminWorkspace({ section, data }: { section: AdminSection; data?: any; }) {
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<CategoryData | null>(null);
+  const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
+
+  const [isTypeModalOpen, setIsTypeModalOpen] = useState(false);
+  const [editingType, setEditingType] = useState<DocumentTypeData | null>(null);
+  const [typeToDelete, setTypeToDelete] = useState<string | null>(null);
+
+  // Template State
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<TemplateData | null>(null);
+  const [templateToDelete, setTemplateToDelete] = useState<string | null>(null);
+
+  // Template Handlers
+  const handleAddTemplate = () => {
+    setEditingTemplate(null);
+    setIsTemplateModalOpen(true);
+  };
+
+  const handleEditTemplate = (template: any) => {
+    setEditingTemplate(template);
+    setIsTemplateModalOpen(true);
+  };
+
+  const confirmDeleteTemplate = () => {
+    if (!templateToDelete) return;
+    startTransition(async () => {
+      await fetch(`/api/admin/templates/${templateToDelete}`, { method: "DELETE" });
+      setTemplateToDelete(null);
+      window.location.reload();
+    });
+  };
+
+  const handleToggleTemplateStatus = (id: string, currentStatus: boolean) => {
+    startTransition(async () => {
+      await fetch(`/api/admin/templates/${id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isActive: !currentStatus })
+      });
+      window.location.reload();
+    });
+  };
+
+  const [isPending, startTransition] = useTransition();
+
+  const handleAddCategory = () => {
+    setEditingCategory(null);
+    setIsCategoryModalOpen(true);
+  };
+
+  const handleEditCategory = (cat: any) => {
+    setEditingCategory(cat);
+    setIsCategoryModalOpen(true);
+  };
+
+  const handleDeleteCategory = (id: string) => {
+    setCategoryToDelete(id);
+  };
+
+  const confirmDeleteCategory = () => {
+    if (!categoryToDelete) return;
+    startTransition(async () => {
+      await fetch(`/api/admin/document-categories/${categoryToDelete}`, { method: "DELETE" });
+      setCategoryToDelete(null);
+      window.location.reload();
+    });
+  };
+
+  const handleToggleCategoryStatus = (id: string, current: boolean) => {
+    startTransition(async () => {
+      await fetch(`/api/admin/document-categories/${id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isActive: !current })
+      });
+      window.location.reload();
+    });
+  };
+
+  const handleAddType = () => {
+    setEditingType(null);
+    setIsTypeModalOpen(true);
+  };
+
+  const handleEditType = (type: any) => {
+    setEditingType({ ...type, categoryId: type.category?.id || type.categoryId });
+    setIsTypeModalOpen(true);
+  };
+
+  const handleDeleteType = (id: string) => {
+    setTypeToDelete(id);
+  };
+
+  const confirmDeleteType = () => {
+    if (!typeToDelete) return;
+    startTransition(async () => {
+      await fetch(`/api/admin/document-types/${typeToDelete}`, { method: "DELETE" });
+      setTypeToDelete(null);
+      window.location.reload();
+    });
+  };
+
+  const handleToggleTypeStatus = (id: string, current: boolean) => {
+    startTransition(async () => {
+      await fetch(`/api/admin/document-types/${id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isActive: !current })
+      });
+      window.location.reload();
+    });
+  };
+
   return (
     <div className="min-h-full bg-[#f6f8fb] text-slate-950 dark:bg-slate-950 dark:text-slate-100">
-      <PageHeader section={section} />
+      <CategoryFormModal
+        open={isCategoryModalOpen}
+        initialData={editingCategory}
+        onClose={() => setIsCategoryModalOpen(false)}
+        onSuccess={() => setIsCategoryModalOpen(false)}
+      />
+      <TypeFormModal
+        open={isTypeModalOpen}
+        initialData={editingType}
+        categories={data?.categories || []}
+        onClose={() => setIsTypeModalOpen(false)}
+        onSuccess={() => { setIsTypeModalOpen(false); window.location.reload(); }}
+      />
+      <TemplateFormModal
+        open={isTemplateModalOpen}
+        initialData={editingTemplate}
+        categories={data?.categories || []}
+        documentTypes={data?.documentTypes || []}
+        onClose={() => setIsTemplateModalOpen(false)}
+        onSuccess={() => { setIsTemplateModalOpen(false); window.location.reload(); }}
+      />
+      <ConfirmDialog
+        open={!!categoryToDelete}
+        title="ยืนยันการลบหมวดหมู่"
+        description="คุณแน่ใจหรือไม่ว่าต้องการลบหมวดหมู่นี้? การกระทำนี้ไม่สามารถย้อนกลับได้"
+        onCancel={() => setCategoryToDelete(null)}
+        onConfirm={confirmDeleteCategory}
+        confirmText={isPending ? "กำลังลบ..." : "ยืนยันลบ"}
+      />
+      <ConfirmDialog
+        open={!!typeToDelete}
+        title="ยืนยันการลบประเภทเอกสาร"
+        description="คุณแน่ใจหรือไม่ว่าต้องการลบประเภทเอกสารนี้? การกระทำนี้ไม่สามารถย้อนกลับได้"
+        onCancel={() => setTypeToDelete(null)}
+        onConfirm={confirmDeleteType}
+        confirmText={isPending ? "กำลังลบ..." : "ยืนยันลบ"}
+      />
+      <ConfirmDialog
+        open={!!templateToDelete}
+        title="ยืนยันการลบ Template"
+        description="คุณแน่ใจหรือไม่ว่าต้องการลบ Template นี้? การกระทำนี้ไม่สามารถย้อนกลับได้"
+        onCancel={() => setTemplateToDelete(null)}
+        onConfirm={confirmDeleteTemplate}
+        confirmText={isPending ? "กำลังลบ..." : "ยืนยันลบ"}
+      />
+      <PageHeader
+        section={section}
+        onAdd={
+          section === "document-categories" ? handleAddCategory :
+            section === "document-types" ? handleAddType :
+              section === "templates" ? handleAddTemplate :
+                undefined
+        }
+      />
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
         {section === "dashboard" && <AdminDashboard />}
 
@@ -662,20 +891,53 @@ export function SystemAdminWorkspace({ section }: { section: AdminSection }) {
         )}
 
         {section === "document-categories" && (
-          <DataShell placeholder="ค้นหาหมวดหมู่ slug หรือ icon" filters={["สถานะ: ทั้งหมด", "เรียงตามลำดับ"]} actions={["เพิ่มหมวดหมู่", "แก้ไข", "ลบ", "เปิด/ปิด", "เรียงลำดับ", "กำหนด slug", "กำหนด icon"]}>
-            <CategoryCards />
+          <DataShell
+            placeholder="ค้นหาหมวดหมู่ slug หรือ icon"
+            filters={["สถานะ: ทั้งหมด", "เรียงตามลำดับ"]}
+            actions={[
+              { label: "เพิ่มหมวดหมู่", onClick: handleAddCategory },
+              "เรียงลำดับ"
+            ]}
+          >
+            {data?.categories?.length > 0 ? (
+              <CategoryCards
+                categories={data.categories}
+                onEdit={handleEditCategory}
+                onDelete={handleDeleteCategory}
+                onToggleStatus={handleToggleCategoryStatus}
+              />
+            ) : (
+              <div className="p-8 text-center text-slate-500">ไม่มีข้อมูลหมวดหมู่เอกสาร</div>
+            )}
           </DataShell>
         )}
 
         {section === "document-types" && (
-          <DataShell placeholder="ค้นหาประเภทเอกสาร" filters={["หมวดหมู่: ทั้งหมด", "สถานะ: ทั้งหมด"]} actions={["เพิ่มประเภทเอกสาร", "แก้ไข", "ลบ", "เปิด/ปิด", "เรียงลำดับ"]}>
-            <DocumentTypesTable />
+          <DataShell
+            placeholder="ค้นหาประเภทเอกสาร"
+            filters={["หมวดหมู่: ทั้งหมด", "สถานะ: ทั้งหมด"]}
+            actions={[
+              { label: "เพิ่มประเภทเอกสาร", onClick: handleAddType },
+              "เรียงลำดับ"
+            ]}
+          >
+            <DocumentTypesTable
+              types={data?.documentTypes || []}
+              onEdit={handleEditType}
+              onDelete={handleDeleteType}
+              onToggleStatus={handleToggleTypeStatus}
+            />
           </DataShell>
         )}
 
         {section === "templates" && (
           <DataShell placeholder="ค้นหา Template กลาง หมวดหมู่ หรือประเภทเอกสาร" filters={["Global: ทั้งหมด", "หมวดหมู่: ทั้งหมด", "ประเภทเอกสาร: ทั้งหมด", "สถานะ: ทั้งหมด"]} actions={actions.templates}>
-            <TemplateGrid />
+            <TemplateGrid 
+              templates={data?.templates || []}
+              onEdit={handleEditTemplate}
+              onDelete={setTemplateToDelete}
+              onToggleStatus={handleToggleTemplateStatus}
+            />
           </DataShell>
         )}
 

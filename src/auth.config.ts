@@ -17,7 +17,7 @@ export const authConfig = {
 
         if (credentials?.email === "admin@example.com" && credentials?.password === "password") {
           return {
-            id: "system-admin-1",
+            id: "668f191e810c19729de860e1",
             name: "System Admin",
             email: "admin@example.com",
             role: "SUPER_ADMIN"
@@ -26,7 +26,7 @@ export const authConfig = {
 
         if (credentials?.email === "support@example.com" && credentials?.password === "password") {
           return {
-            id: "system-admin-support-1",
+            id: "668f191e810c19729de860e2",
             name: "Support Admin",
             email: "support@example.com",
             role: "SUPPORT"
@@ -34,14 +34,14 @@ export const authConfig = {
         }
 
         const companyUsers = {
-          "owner@example.com": { id: "company-user-owner", name: "Company Owner", role: "OWNER" },
-          "company-admin@example.com": { id: "company-user-admin", name: "Company Admin", role: "ADMIN" },
-          "accountant@example.com": { id: "company-user-accountant", name: "Accountant", role: "ACCOUNTANT" },
-          "finance@example.com": { id: "company-user-finance", name: "Finance", role: "FINANCE" },
-          "hr@example.com": { id: "company-user-hr", name: "HR", role: "HR" },
-          "operation@example.com": { id: "company-user-operation", name: "Operation", role: "OPERATION" },
-          "staff@example.com": { id: "company-user-staff", name: "Staff", role: "STAFF" },
-          "viewer@example.com": { id: "company-user-viewer", name: "Viewer", role: "VIEWER" },
+          "owner@example.com": { id: "668f191e810c19729de860e3", name: "Company Owner", role: "OWNER" },
+          "company-admin@example.com": { id: "668f191e810c19729de860e4", name: "Company Admin", role: "ADMIN" },
+          "accountant@example.com": { id: "668f191e810c19729de860e5", name: "Accountant", role: "ACCOUNTANT" },
+          "finance@example.com": { id: "668f191e810c19729de860e6", name: "Finance", role: "FINANCE" },
+          "hr@example.com": { id: "668f191e810c19729de860e7", name: "HR", role: "HR" },
+          "operation@example.com": { id: "668f191e810c19729de860e8", name: "Operation", role: "OPERATION" },
+          "staff@example.com": { id: "668f191e810c19729de860e9", name: "Staff", role: "STAFF" },
+          "viewer@example.com": { id: "668f191e810c19729de860eb", name: "Viewer", role: "VIEWER" },
         } as const;
 
         const email = credentials?.email as keyof typeof companyUsers | undefined;
@@ -49,7 +49,7 @@ export const authConfig = {
           return {
             ...companyUsers[email],
             email,
-            companyId: "company-demo-1",
+            companyId: "668f191e810c19729de860ea",
           };
         }
 
