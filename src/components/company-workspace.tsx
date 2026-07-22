@@ -2852,9 +2852,9 @@ export function CompanyWorkspace({ section, data, companyId }: { section: Compan
         {section === "business-partners" && <><Toolbar placeholder="ค้นหาลูกค้า / คู่ค้า" filters={["CUSTOMER / VENDOR"]} actions={[]} /><BusinessPartners /></>}
         {section === "employees" && <EmployeeManagement initialEmployees={data?.employees} departments={data?.departments} companyId={companyId} />}
         {section === "departments" && <DepartmentManagement initialDepartments={data?.departments} companyId={companyId} />}
-        {section === "approval-flows" && <ApprovalFlows />}
-        {section === "approvals" && <Approvals />}
-        {section === "document-number-settings" && <NumberSettings />}
+        {section === "approval-flows" && <ApprovalFlows data={data} companyId={companyId} />}
+        {section === "approvals" && <Approvals data={data} companyId={companyId} />}
+        {section === "document-number-settings" && <NumberSettings data={data} companyId={companyId} />}
         {section === "reports" && <Reports />}
         {section === "settings-company" && <SettingsCompany data={data} companyId={companyId} />}
         {section === "settings-users" && <SettingsUsers data={data} companyId={companyId} />}

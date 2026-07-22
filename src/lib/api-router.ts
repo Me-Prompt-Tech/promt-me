@@ -226,14 +226,6 @@ export async function dbDetail(resource: string, whereClause: any = {}) {
 
 export async function dbCreate(resource: string, dataPayload: any) {
   const model = getPrismaModel(resource);
-<<<<<<< Updated upstream
-  const include = resource === "employees"
-    ? { department: true }
-    : resource === "departments"
-      ? { _count: { select: { users: true, employees: true } } }
-      : undefined;
-  const data = await model.create({ data: dataPayload, include });
-=======
   let payload = { ...dataPayload };
   if (resource === "employees") {
     if (payload.startDate && typeof payload.startDate === "string") payload.startDate = new Date(payload.startDate);
@@ -246,22 +238,13 @@ export async function dbCreate(resource: string, dataPayload: any) {
         ? { _count: { select: { users: true, employees: true } } }
         : undefined;
   const data = await model.create({ data: payload, include });
->>>>>>> Stashed changes
   return { ok: true, action: "create", resource, data };
 }
 
 export async function dbUpdate(resource: string, whereClause: any, dataPayload: any) {
   const model = getPrismaModel(resource);
-  const include = resource === "employees"
-    ? { department: true }
-    : resource === "departments"
-      ? { _count: { select: { users: true, employees: true } } }
-      : undefined;
   const existing = await model.findFirst({ where: whereClause });
   if (!existing) throw new ApiError("NOT_FOUND", "ไม่พบข้อมูล", 404);
-<<<<<<< Updated upstream
-  const data = await model.update({ where: { id: existing.id }, data: dataPayload, include });
-=======
   let payload = { ...dataPayload };
   if (resource === "employees") {
     if (payload.startDate && typeof payload.startDate === "string") payload.startDate = new Date(payload.startDate);
@@ -274,7 +257,6 @@ export async function dbUpdate(resource: string, whereClause: any, dataPayload: 
         ? { _count: { select: { users: true, employees: true } } }
         : undefined;
   const data = await model.update({ where: { id: existing.id }, data: payload, include });
->>>>>>> Stashed changes
   return { ok: true, action: "update", resource, data };
 }
 

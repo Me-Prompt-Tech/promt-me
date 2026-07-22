@@ -207,7 +207,6 @@ export const businessPartnerSchema = z.object({
 export const employeeSchema = z.object({
   code: optionalString,
   name: nonEmptyString,
-<<<<<<< Updated upstream
   email: optionalEmail,
   phone: optionalString,
   position: optionalString,
@@ -215,15 +214,6 @@ export const employeeSchema = z.object({
   salarySatang: z.coerce.number().int().min(0).optional().nullable(),
   startDate: optionalString,
   endDate: optionalString,
-=======
-  email: z.string().trim().email("อีเมลไม่ถูกต้อง").optional().or(z.literal("")),
-  phone: optionalString,
-  position: optionalString,
-  departmentId: optionalString,
-  salarySatang: z.coerce.number().int().min(0).optional().nullable(),
-  startDate: z.string().optional().nullable(),
-  endDate: z.string().optional().nullable(),
->>>>>>> Stashed changes
   status: z.enum(["ACTIVE", "INVITED", "SUSPENDED", "DELETED"]).default("ACTIVE"),
 });
 
