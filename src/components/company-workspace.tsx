@@ -20,11 +20,13 @@ import { useState, useTransition, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
-import { ConfirmDialog } from "@/components/ui/app-components";
+import { ConfirmDialog, FormModal } from "@/components/ui/app-components";
 import { DocumentDesigner } from "@/components/document-designer";
 import { TaxInvoiceTemplate } from "@/components/templates/tax-invoice";
 import { QuotationTemplate } from "@/components/templates/quotation";
 import { CompanyAffidavitTemplate } from "@/components/templates/company-affidavit";
+import { EmployeeManagement } from "@/components/employee-management";
+import { DepartmentManagement } from "@/components/department-management";
 
 export type CompanySection =
   | "dashboard"
@@ -140,8 +142,8 @@ function ActionButton({ action, label: propLabel, onClick: propOnClick }: { acti
   const Icon = label.includes("ลบ") ? Trash2 : label.includes("แก้") ? Pencil : label.includes("Duplicate") ? Copy : label.includes("Export") || label.includes("Download") ? Download : label.includes("Preview") || label.includes("รายละเอียด") ? Eye : label.includes("อนุมัติ") ? Send : Plus;
 
   const className = `inline-flex h-8 items-center gap-1.5 rounded-md border px-2 text-xs font-medium ${destructive
-      ? "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
-      : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+    ? "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100"
+    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
     }`;
 
   if (href) {
@@ -337,7 +339,7 @@ function CreateDocument({ categories = [], documentTypes = [], companyId }: { ca
                 .filter((t: any) => !formData.categoryId || t.categoryId === formData.categoryId)
                 .map((t: any) => (
                   <option key={t.id} value={t.id}>{t.name}</option>
-              ))}
+                ))}
             </select>
           </label>
         </form>
@@ -474,8 +476,8 @@ function DocumentDetail({ data, companyId }: { data?: any; companyId?: string })
         <div className="flex flex-wrap gap-2 mb-4">
           <ActionButton action={{ label: "แก้ไข", href: `/th/documents/create?edit=${doc.id}` }} />
           {(doc.status === "DRAFT" || doc.status === "REJECTED") && (
-            <button 
-              onClick={handleSubmitApproval} 
+            <button
+              onClick={handleSubmitApproval}
               disabled={isPending}
               className="inline-flex h-8 items-center gap-1.5 rounded-md bg-teal-600 px-3 text-xs font-medium text-white hover:bg-teal-700 disabled:opacity-50 cursor-pointer animate-pulse"
             >
@@ -812,190 +814,979 @@ function Fields() {
 }
 
 function BusinessPartners() {
-  const [data, setData] = useState(partners);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editingItem, setEditingItem] = useState<any>(null);
-  const [deleteId, setDeleteId] = useState<number | null>(null);
+  return <DataTable headers={["ชื่อ", "ประเภท", "Tax ID", "สาขา", "อีเมล", "เบอร์โทร", "ที่อยู่", "ผู้ติดต่อ", "เอกสาร"]} rows={partners.map((p) => [p.name, p.type, p.taxId, p.branch, p.email, p.phone, p.address, `${p.contact} ${p.contactPhone}`, p.docs])} actions={["เพิ่มลูกค้า", "แก้ไขลูกค้า", "ลบลูกค้า", "ดูเอกสารที่เกี่ยวข้อง"]} />;
+}
 
-  const initialForm = {
+function EmployeesSection({
+  companyId,
+  initialEmployees = [],
+  departments = [],
+}: {
+  companyId?: string;
+  initialEmployees?: any[];
+  departments?: any[];
+}) {
+  const [employeesList, setEmployeesList] = useState<any[]>(() => {
+    if (initialEmployees && initialEmployees.length > 0) {
+      return initialEmployees;
+    }
+    return [
+      { id: "EMP-001", code: "EMP-001", name: "คุณวราภรณ์", email: "accountant@example.com", phone: "081-111-2233", position: "Senior Accountant", department: { name: "บัญชี" }, departmentId: "", salarySatang: 5800000, startDate: "2024-01-01", endDate: "-", status: "ACTIVE" },
+      { id: "EMP-002", code: "EMP-002", name: "คุณอรทัย", email: "finance@example.com", phone: "082-444-9988", position: "Finance Manager", department: { name: "การเงิน" }, departmentId: "", salarySatang: 7200000, startDate: "2023-03-15", endDate: "-", status: "ACTIVE" },
+      { id: "EMP-003", code: "EMP-003", name: "คุณกิตติ", email: "operation@example.com", phone: "083-555-1122", position: "Operation Lead", department: { name: "ปฏิบัติการ" }, departmentId: "", salarySatang: 4900000, startDate: "2025-06-01", endDate: "-", status: "ACTIVE" },
+    ];
+  });
+
+  const [deptList, setDeptList] = useState<any[]>(() => {
+    if (departments && departments.length > 0) return departments;
+    return [
+      { id: "dept-1", name: "บัญชี" },
+      { id: "dept-2", name: "การเงิน" },
+      { id: "dept-3", name: "บุคคล" },
+      { id: "dept-4", name: "ปฏิบัติการ" },
+    ];
+  });
+
+  useEffect(() => {
+    if (initialEmployees && initialEmployees.length > 0) {
+      setEmployeesList(initialEmployees);
+    }
+  }, [initialEmployees]);
+
+  useEffect(() => {
+    if (departments && departments.length > 0) {
+      setDeptList(departments);
+    }
+  }, [departments]);
+
+  const [search, setSearch] = useState("");
+  const [filterDept, setFilterDept] = useState("ALL");
+  const [filterStatus, setFilterStatus] = useState("ALL");
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<any | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [formData, setFormData] = useState({
+    code: "",
     name: "",
-    type: "CUSTOMER",
-    taxId: "",
-    branch: "",
     email: "",
     phone: "",
-    address: "",
-    contact: "",
-    contactPhone: ""
-  };
-  const [formData, setFormData] = useState(initialForm);
+    position: "",
+    departmentId: "",
+    salary: "",
+    startDate: "",
+    endDate: "",
+    status: "ACTIVE",
+  });
 
-  const handleAdd = () => {
-    setFormData(initialForm);
+  const handleOpenAdd = () => {
     setEditingItem(null);
-    setIsEditing(true);
+    setFormData({
+      code: `EMP-00${employeesList.length + 1}`,
+      name: "",
+      email: "",
+      phone: "",
+      position: "",
+      departmentId: deptList[0]?.id || "",
+      salary: "30000",
+      startDate: new Date().toISOString().split("T")[0],
+      endDate: "",
+      status: "ACTIVE",
+    });
+    setIsModalOpen(true);
   };
 
-  const handleEdit = (idx: number) => {
-    setFormData(data[idx]);
-    setEditingItem(idx);
-    setIsEditing(true);
-  };
+  const handleOpenEdit = (emp: any) => {
+    setEditingItem(emp);
+    const salaryVal = emp.salarySatang != null
+      ? (emp.salarySatang / 100).toString()
+      : (typeof emp.salary === "string" ? emp.salary.replace(/[^0-9.]/g, "") : "");
 
-  const handleDelete = (idx: number) => {
-    setDeleteId(idx);
-  };
-
-  const confirmDelete = () => {
-    if (deleteId !== null) {
-      const newData = [...data];
-      newData.splice(deleteId, 1);
-      setData(newData);
-      setDeleteId(null);
+    let formattedStartDate = "";
+    if (emp.startDate) {
+      try {
+        formattedStartDate = new Date(emp.startDate).toISOString().split("T")[0];
+      } catch {
+        formattedStartDate = emp.startDate;
+      }
     }
+
+    let formattedEndDate = "";
+    if (emp.endDate && emp.endDate !== "-") {
+      try {
+        formattedEndDate = new Date(emp.endDate).toISOString().split("T")[0];
+      } catch {
+        formattedEndDate = emp.endDate;
+      }
+    }
+
+    setFormData({
+      code: emp.code || "",
+      name: emp.name || "",
+      email: emp.email || "",
+      phone: emp.phone || "",
+      position: emp.position || "",
+      departmentId: emp.departmentId || emp.department?.id || "",
+      salary: salaryVal,
+      startDate: formattedStartDate,
+      endDate: formattedEndDate,
+      status: emp.status || "ACTIVE",
+    });
+    setIsModalOpen(true);
   };
 
-  const handleSave = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (editingItem !== null) {
-      const newData = [...data];
-      newData[editingItem] = { ...formData, docs: data[editingItem].docs || 0 };
-      setData(newData);
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!formData.name.trim()) {
+      alert("กรุณากรอกชื่อพนักงาน");
+      return;
+    }
+
+    setIsSubmitting(true);
+    const salaryNum = parseFloat(formData.salary || "0");
+    const salarySatang = isNaN(salaryNum) ? 0 : Math.round(salaryNum * 100);
+
+    const validDeptId = formData.departmentId && /^[0-9a-fA-F]{24}$/.test(formData.departmentId)
+      ? formData.departmentId
+      : undefined;
+
+    const payload = {
+      code: formData.code || undefined,
+      name: formData.name,
+      email: formData.email || undefined,
+      phone: formData.phone || undefined,
+      position: formData.position || undefined,
+      departmentId: validDeptId,
+      salarySatang,
+      startDate: formData.startDate ? new Date(formData.startDate).toISOString() : undefined,
+      endDate: formData.endDate ? new Date(formData.endDate).toISOString() : undefined,
+      status: formData.status,
+    };
+
+    if (companyId) {
+      try {
+        let res;
+        if (editingItem) {
+          res = await fetch(`/api/company/${companyId}/employees/${editingItem.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          }).then((r) => r.json());
+        } else {
+          res = await fetch(`/api/company/${companyId}/employees`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          }).then((r) => r.json());
+        }
+
+        if (res.ok && res.data) {
+          const saved = res.data;
+          if (editingItem) {
+            setEmployeesList((prev) => prev.map((item) => (item.id === editingItem.id ? saved : item)));
+          } else {
+            setEmployeesList((prev) => [saved, ...prev]);
+          }
+          setIsModalOpen(false);
+        } else {
+          const detailMsg = res.details?.map((d: any) => `${d.field ? d.field + ": " : ""}${d.message}`).join(", ");
+          alert((res.message || "เกิดข้อผิดพลาดในการบันทึกข้อมูล") + (detailMsg ? `\n- ${detailMsg}` : ""));
+        }
+      } catch (err: any) {
+        alert("เกิดข้อผิดพลาด: " + err.message);
+      } finally {
+        setIsSubmitting(false);
+      }
     } else {
-      setData([{ ...formData, docs: 0 }, ...data]);
+      const deptObj = deptList.find((d) => d.id === formData.departmentId) || { name: deptList.find((d) => d.id === formData.departmentId)?.name || "-" };
+      const formattedSalary = salaryNum > 0 ? `฿${salaryNum.toLocaleString()}` : "-";
+      if (editingItem) {
+        const updated = {
+          ...editingItem,
+          code: formData.code,
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          position: formData.position,
+          departmentId: formData.departmentId,
+          department: deptObj,
+          salary: formattedSalary,
+          salarySatang,
+          startDate: formData.startDate || "-",
+          endDate: formData.endDate || "-",
+          status: formData.status,
+        };
+        setEmployeesList((prev) => prev.map((item) => (item.id === editingItem.id ? updated : item)));
+      } else {
+        const newItem = {
+          id: `EMP-${Date.now()}`,
+          code: formData.code,
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          position: formData.position,
+          departmentId: formData.departmentId,
+          department: deptObj,
+          salary: formattedSalary,
+          salarySatang,
+          startDate: formData.startDate || "-",
+          endDate: formData.endDate || "-",
+          status: formData.status,
+        };
+        setEmployeesList((prev) => [newItem, ...prev]);
+      }
+      setIsSubmitting(false);
+      setIsModalOpen(false);
     }
-    setIsEditing(false);
   };
 
-  if (isEditing) {
-    return (
-      <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950">
-        <h2 className="text-xl font-semibold mb-4">{editingItem !== null ? "แก้ไขข้อมูลลูกค้า / คู่ค้า" : "เพิ่มลูกค้า / คู่ค้าใหม่"}</h2>
-        <form onSubmit={handleSave} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <label className="block">
-              <span className="text-sm font-medium">ชื่อบริษัท/ร้านค้า</span>
-              <input required className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm dark:border-slate-700 dark:bg-slate-900" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} />
-            </label>
-            <label className="block">
-              <span className="text-sm font-medium">ประเภท</span>
-              <select className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm dark:border-slate-700 dark:bg-slate-900" value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value })}>
-                <option value="CUSTOMER">CUSTOMER</option>
-                <option value="VENDOR">VENDOR</option>
-              </select>
-            </label>
-            <label className="block">
-              <span className="text-sm font-medium">เลขประจำตัวผู้เสียภาษี (Tax ID)</span>
-              <input className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm dark:border-slate-700 dark:bg-slate-900" value={formData.taxId} onChange={e => setFormData({ ...formData, taxId: e.target.value })} />
-            </label>
-            <label className="block">
-              <span className="text-sm font-medium">รหัสสาขา</span>
-              <input className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm dark:border-slate-700 dark:bg-slate-900" value={formData.branch} onChange={e => setFormData({ ...formData, branch: e.target.value })} />
-            </label>
-            <label className="block">
-              <span className="text-sm font-medium">อีเมล</span>
-              <input type="email" className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm dark:border-slate-700 dark:bg-slate-900" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} />
-            </label>
-            <label className="block">
-              <span className="text-sm font-medium">เบอร์โทรศัพท์</span>
-              <input className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm dark:border-slate-700 dark:bg-slate-900" value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} />
-            </label>
-            <label className="block md:col-span-2">
-              <span className="text-sm font-medium">ที่อยู่</span>
-              <textarea className="mt-1 h-20 w-full rounded-md border border-slate-200 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900" value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} />
-            </label>
-            <label className="block">
-              <span className="text-sm font-medium">ผู้ติดต่อ</span>
-              <input className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm dark:border-slate-700 dark:bg-slate-900" value={formData.contact} onChange={e => setFormData({ ...formData, contact: e.target.value })} />
-            </label>
-            <label className="block">
-              <span className="text-sm font-medium">เบอร์โทรผู้ติดต่อ</span>
-              <input className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm dark:border-slate-700 dark:bg-slate-900" value={formData.contactPhone} onChange={e => setFormData({ ...formData, contactPhone: e.target.value })} />
-            </label>
-          </div>
-          <div className="flex justify-end gap-3 mt-6">
-            <button type="button" onClick={() => setIsEditing(false)} className="px-4 py-2 text-sm font-medium border border-slate-300 rounded-md hover:bg-slate-50 text-slate-700 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">ยกเลิก</button>
-            <button type="submit" className="px-4 py-2 text-sm font-medium bg-teal-600 text-white rounded-md hover:bg-teal-700">บันทึกข้อมูล</button>
-          </div>
-        </form>
-      </div>
-    );
-  }
+  const handleConfirmDelete = async () => {
+    if (!deletingId) return;
+    setIsSubmitting(true);
+
+    if (companyId) {
+      try {
+        const res = await fetch(`/api/company/${companyId}/employees/${deletingId}`, {
+          method: "DELETE",
+        }).then((r) => r.json());
+
+        if (res.ok) {
+          setEmployeesList((prev) => prev.filter((item) => item.id !== deletingId));
+          setDeletingId(null);
+        } else {
+          alert(res.message || "เกิดข้อผิดพลาดในการลบข้อมูล");
+        }
+      } catch (err: any) {
+        alert("เกิดข้อผิดพลาด: " + err.message);
+      } finally {
+        setIsSubmitting(false);
+      }
+    } else {
+      setEmployeesList((prev) => prev.filter((item) => item.id !== deletingId));
+      setDeletingId(null);
+      setIsSubmitting(false);
+    }
+  };
+
+  const filteredEmployees = employeesList.filter((emp) => {
+    const q = search.toLowerCase().trim();
+    const deptName = emp.department?.name || (typeof emp.department === "string" ? emp.department : "");
+    const matchesSearch =
+      !q ||
+      (emp.name && emp.name.toLowerCase().includes(q)) ||
+      (emp.code && emp.code.toLowerCase().includes(q)) ||
+      (emp.email && emp.email.toLowerCase().includes(q)) ||
+      (emp.position && emp.position.toLowerCase().includes(q)) ||
+      (deptName && deptName.toLowerCase().includes(q));
+
+    const matchesDept =
+      filterDept === "ALL" ||
+      emp.departmentId === filterDept ||
+      deptName === filterDept;
+
+    const matchesStatus = filterStatus === "ALL" || emp.status === filterStatus;
+
+    return matchesSearch && matchesDept && matchesStatus;
+  });
 
   return (
     <div className="space-y-4">
-      <ConfirmDialog
-        open={deleteId !== null}
-        title="ยืนยันการลบข้อมูล"
-        description="คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูลนี้? การกระทำนี้ไม่สามารถย้อนกลับได้"
-        onCancel={() => setDeleteId(null)}
-        onConfirm={confirmDelete}
-        confirmText="ยืนยันลบ"
-      />
-      <div className="flex flex-wrap gap-2">
-        <ActionButton action={{ label: "เพิ่มลูกค้า / คู่ค้า", onClick: handleAdd }} />
+      {/* Toolbar */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={handleOpenAdd}
+            className="inline-flex h-10 items-center gap-1.5 rounded-md bg-teal-600 px-3.5 text-xs font-semibold text-white hover:bg-teal-700 transition shadow-sm"
+          >
+            <Plus className="size-4" />
+            เพิ่มพนักงาน
+          </button>
+        </div>
+
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="ค้นหาชื่อ, รหัส, ตำแหน่ง"
+              className="h-10 w-full rounded-md border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-900 outline-none transition focus:border-teal-500 focus:ring-1 focus:ring-teal-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 sm:w-64"
+            />
+          </div>
+
+          <select
+            value={filterDept}
+            onChange={(e) => setFilterDept(e.target.value)}
+            className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
+          >
+            <option value="ALL">แผนกทั้งหมด</option>
+            {deptList.map((d) => (
+              <option key={d.id || d.name} value={d.id || d.name}>
+                {d.name}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
+          >
+            <option value="ALL">สถานะทั้งหมด</option>
+            <option value="ACTIVE">ACTIVE</option>
+            <option value="SUSPENDED">SUSPENDED</option>
+            <option value="DELETED">DELETED</option>
+          </select>
+        </div>
       </div>
+
+      {/* Table */}
       <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950">
-        <table className="w-full min-w-[1000px] text-left text-sm">
-          <thead className="text-xs uppercase text-slate-500 border-b border-slate-200 dark:border-slate-800">
+        <table className="w-full min-w-[950px] text-left text-sm">
+          <thead className="text-xs uppercase text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-slate-800">
             <tr>
-              <th className="py-3 pr-4 font-semibold">ชื่อบริษัท/ร้านค้า</th>
-              <th className="py-3 pr-4 font-semibold">ประเภท</th>
-              <th className="py-3 pr-4 font-semibold">Tax ID / สาขา</th>
-              <th className="py-3 pr-4 font-semibold">ติดต่อ</th>
-              <th className="py-3 pr-4 font-semibold">ผู้ติดต่อ</th>
-              <th className="py-3 pr-4 font-semibold">เอกสาร</th>
+              <th className="py-3 pr-4 font-semibold">รหัส</th>
+              <th className="py-3 pr-4 font-semibold">ชื่อ</th>
+              <th className="py-3 pr-4 font-semibold">อีเมล</th>
+              <th className="py-3 pr-4 font-semibold">เบอร์โทร</th>
+              <th className="py-3 pr-4 font-semibold">ตำแหน่ง</th>
+              <th className="py-3 pr-4 font-semibold">แผนก</th>
+              <th className="py-3 pr-4 font-semibold">เงินเดือน</th>
+              <th className="py-3 pr-4 font-semibold">เริ่มงาน</th>
+              <th className="py-3 pr-4 font-semibold">ลาออก</th>
+              <th className="py-3 pr-4 font-semibold">สถานะ</th>
               <th className="py-3 font-semibold text-right">จัดการ</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-            {data.length === 0 ? (
-              <tr><td colSpan={7} className="py-8 text-center text-slate-500">ไม่มีข้อมูลลูกค้า / คู่ค้า</td></tr>
+            {filteredEmployees.length === 0 ? (
+              <tr>
+                <td colSpan={11} className="py-8 text-center text-slate-500">
+                  ไม่พบข้อมูลพนักงาน
+                </td>
+              </tr>
             ) : (
-              data.map((p, idx) => (
-                <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-900/50">
-                  <td className="py-4 pr-4">
-                    <div className="font-medium text-slate-900 dark:text-slate-100">{p.name}</div>
-                    <div className="text-xs text-slate-500 mt-0.5 line-clamp-1">{p.address}</div>
-                  </td>
-                  <td className="py-4 pr-4">
-                    <Status value={p.type} />
-                  </td>
-                  <td className="py-4 pr-4">
-                    <div className="text-slate-700 dark:text-slate-300">{p.taxId || "-"}</div>
-                    <div className="text-xs text-slate-500 mt-0.5">สาขา: {p.branch || "-"}</div>
-                  </td>
-                  <td className="py-4 pr-4">
-                    <div className="text-slate-700 dark:text-slate-300">{p.email || "-"}</div>
-                    <div className="text-xs text-slate-500 mt-0.5">{p.phone || "-"}</div>
-                  </td>
-                  <td className="py-4 pr-4">
-                    <div className="text-slate-700 dark:text-slate-300">{p.contact || "-"}</div>
-                    <div className="text-xs text-slate-500 mt-0.5">{p.contactPhone || "-"}</div>
-                  </td>
-                  <td className="py-4 pr-4 text-slate-700 dark:text-slate-300">{p.docs || 0}</td>
-                  <td className="py-4 text-right">
-                    <div className="flex justify-end gap-1.5">
-                      <ActionButton action={{ label: "แก้ไข", onClick: () => handleEdit(idx) }} />
-                      <ActionButton action={{ label: "ลบ", destructive: true, onClick: () => handleDelete(idx) }} />
-                    </div>
-                  </td>
-                </tr>
-              ))
+              filteredEmployees.map((emp) => {
+                const deptName = emp.department?.name || (typeof emp.department === "string" ? emp.department : "-");
+                let formattedSalary = emp.salary;
+                if (!formattedSalary && emp.salarySatang != null) {
+                  formattedSalary = `฿${(emp.salarySatang / 100).toLocaleString()}`;
+                }
+
+                let startDateStr = emp.startDate || "-";
+                if (emp.startDate && emp.startDate !== "-") {
+                  try {
+                    const d = new Date(emp.startDate);
+                    if (!isNaN(d.getTime())) {
+                      startDateStr = d.toLocaleDateString("th-TH", { day: "2-digit", month: "short", year: "numeric" });
+                    }
+                  } catch { }
+                }
+
+                let endDateStr = emp.endDate || "-";
+                if (emp.endDate && emp.endDate !== "-") {
+                  try {
+                    const d = new Date(emp.endDate);
+                    if (!isNaN(d.getTime())) {
+                      endDateStr = d.toLocaleDateString("th-TH", { day: "2-digit", month: "short", year: "numeric" });
+                    }
+                  } catch { }
+                }
+
+                return (
+                  <tr key={emp.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/50">
+                    <td className="py-4 pr-4 font-semibold text-slate-950 dark:text-slate-100">{emp.code || "-"}</td>
+                    <td className="py-4 pr-4 font-medium text-slate-800 dark:text-slate-200">{emp.name}</td>
+                    <td className="py-4 pr-4 text-slate-600 dark:text-slate-400">{emp.email || "-"}</td>
+                    <td className="py-4 pr-4 text-slate-600 dark:text-slate-400">{emp.phone || "-"}</td>
+                    <td className="py-4 pr-4 text-slate-700 dark:text-slate-300">{emp.position || "-"}</td>
+                    <td className="py-4 pr-4 text-slate-700 dark:text-slate-300">{deptName}</td>
+                    <td className="py-4 pr-4 text-slate-700 dark:text-slate-300 font-medium">{formattedSalary || "-"}</td>
+                    <td className="py-4 pr-4 text-slate-600 dark:text-slate-400 text-xs">{startDateStr}</td>
+                    <td className="py-4 pr-4 text-slate-600 dark:text-slate-400 text-xs">{endDateStr}</td>
+                    <td className="py-4 pr-4">
+                      <Status value={emp.status || "ACTIVE"} />
+                    </td>
+                    <td className="py-4 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          onClick={() => handleOpenEdit(emp)}
+                          className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 transition"
+                        >
+                          <Pencil className="size-3.5" />
+                          แก้ไข
+                        </button>
+                        <button
+                          onClick={() => setDeletingId(emp.id)}
+                          className="inline-flex h-8 items-center gap-1 rounded-md border border-rose-200 bg-rose-50 px-2.5 text-xs font-medium text-rose-700 hover:bg-rose-100 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400 transition"
+                        >
+                          <Trash2 className="size-3.5" />
+                          ลบ
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
       </div>
+
+      {/* Add / Edit Form Modal */}
+      <FormModal
+        open={isModalOpen}
+        title={editingItem ? "แก้ไขข้อมูลพนักงาน" : "เพิ่มพนักงานใหม่"}
+        description={editingItem ? `แก้ไขข้อมูลของ ${editingItem.name}` : "กรอกข้อมูลพนักงานที่ต้องการเพิ่มเข้าสู่ระบบ"}
+        onClose={() => setIsModalOpen(false)}
+        onSubmit={() => handleSubmit()}
+      >
+        <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2 text-left">
+          <label className="block">
+            <span className="text-xs font-medium text-slate-700 dark:text-slate-300">รหัสพนักงาน</span>
+            <input
+              type="text"
+              value={formData.code}
+              onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+              placeholder="เช่น EMP-001"
+              className="mt-1 h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-teal-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+            />
+          </label>
+
+          <label className="block">
+            <span className="text-xs font-medium text-slate-700 dark:text-slate-300">ชื่อ-นามสกุล <span className="text-rose-500">*</span></span>
+            <input
+              type="text"
+              required
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              placeholder="กรอกชื่อ-นามสกุล"
+              className="mt-1 h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-teal-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+            />
+          </label>
+
+          <label className="block">
+            <span className="text-xs font-medium text-slate-700 dark:text-slate-300">อีเมล</span>
+            <input
+              type="email"
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              placeholder="example@company.com"
+              className="mt-1 h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-teal-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+            />
+          </label>
+
+          <label className="block">
+            <span className="text-xs font-medium text-slate-700 dark:text-slate-300">เบอร์โทรศัพท์</span>
+            <input
+              type="text"
+              value={formData.phone}
+              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              placeholder="08X-XXX-XXXX"
+              className="mt-1 h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-teal-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+            />
+          </label>
+
+          <label className="block">
+            <span className="text-xs font-medium text-slate-700 dark:text-slate-300">ตำแหน่ง</span>
+            <input
+              type="text"
+              value={formData.position}
+              onChange={(e) => setFormData({ ...formData, position: e.target.value })}
+              placeholder="เช่น Accountant, Developer"
+              className="mt-1 h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-teal-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+            />
+          </label>
+
+          <label className="block">
+            <span className="text-xs font-medium text-slate-700 dark:text-slate-300">แผนก</span>
+            <select
+              value={formData.departmentId}
+              onChange={(e) => setFormData({ ...formData, departmentId: e.target.value })}
+              className="mt-1 h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-teal-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+            >
+              <option value="">-- เลือกแผนก --</option>
+              {deptList.map((d) => (
+                <option key={d.id || d.name} value={d.id || d.name}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="block">
+            <span className="text-xs font-medium text-slate-700 dark:text-slate-300">เงินเดือน (บาท)</span>
+            <input
+              type="number"
+              value={formData.salary}
+              onChange={(e) => setFormData({ ...formData, salary: e.target.value })}
+              placeholder="เช่น 35000"
+              className="mt-1 h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-teal-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+            />
+          </label>
+
+          <label className="block">
+            <span className="text-xs font-medium text-slate-700 dark:text-slate-300">สถานะ</span>
+            <select
+              value={formData.status}
+              onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+              className="mt-1 h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-teal-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+            >
+              <option value="ACTIVE">ACTIVE</option>
+              <option value="SUSPENDED">SUSPENDED</option>
+              <option value="DELETED">DELETED</option>
+            </select>
+          </label>
+
+          <label className="block">
+            <span className="text-xs font-medium text-slate-700 dark:text-slate-300">วันที่เริ่มงาน</span>
+            <input
+              type="date"
+              value={formData.startDate}
+              onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+              className="mt-1 h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-teal-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+            />
+          </label>
+
+          <label className="block">
+            <span className="text-xs font-medium text-slate-700 dark:text-slate-300">วันที่ลาออก (ถ้ามี)</span>
+            <input
+              type="date"
+              value={formData.endDate}
+              onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+              className="mt-1 h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-teal-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+            />
+          </label>
+        </form>
+      </FormModal>
+
+      {/* Confirm Delete Dialog */}
+      <ConfirmDialog
+        open={!!deletingId}
+        title="ยืนยันการลบพนักงาน"
+        description="คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูลพนักงานรายนี้? ข้อมูลจะถูกลบออกจากระบบและไม่สามารถย้อนกลับได้"
+        confirmText={isSubmitting ? "กำลังลบ..." : "ยืนยันลบ"}
+        cancelText="ยกเลิก"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeletingId(null)}
+      />
     </div>
   );
 }
 
-function Employees() {
-  return <DataTable headers={["รหัส", "ชื่อ", "อีเมล", "เบอร์โทร", "ตำแหน่ง", "แผนก", "เงินเดือน", "เริ่มงาน", "ลาออก", "สถานะ"]} rows={employees.map(Object.values)} actions={["เพิ่มพนักงาน", "แก้ไขพนักงาน", "ลบพนักงาน", "ดูเอกสารที่เกี่ยวข้อง"]} />;
-}
+function DepartmentsSection({
+  companyId,
+  initialDepartments = [],
+  initialEmployees = [],
+  initialUsers = [],
+}: {
+  companyId?: string;
+  initialDepartments?: any[];
+  initialEmployees?: any[];
+  initialUsers?: any[];
+}) {
+  const [deptList, setDeptList] = useState<any[]>(() => {
+    if (initialDepartments && initialDepartments.length > 0) {
+      return initialDepartments;
+    }
+    return [
+      { id: "dept-1", name: "บัญชี", description: "ฝ่ายบัญชีและการเงินหลัก", isActive: true, status: "ACTIVE", users: 1, employees: 1, _count: { users: 1, employees: 1 } },
+      { id: "dept-2", name: "การเงิน", description: "ฝ่ายการเงิน วางแผนงบประมาณ", isActive: true, status: "ACTIVE", users: 1, employees: 1, _count: { users: 1, employees: 1 } },
+      { id: "dept-3", name: "บุคคล", description: "ฝ่ายบริหารทรัพยากรบุคคล (HR)", isActive: true, status: "ACTIVE", users: 1, employees: 0, _count: { users: 1, employees: 0 } },
+      { id: "dept-4", name: "ปฏิบัติการ", description: "ฝ่ายปฏิบัติการและคลังสินค้า", isActive: true, status: "ACTIVE", users: 1, employees: 1, _count: { users: 1, employees: 1 } },
+    ];
+  });
 
-function Departments() {
-  return <DataTable headers={["แผนก", "สถานะ", "ผู้ใช้งาน", "พนักงาน"]} rows={departments.map((d) => [d.name, d.status, d.users, d.employees])} actions={["เพิ่มแผนก", "แก้ไขแผนก", "ลบแผนก", "เปิด/ปิดแผนก", "ดูผู้ใช้งาน", "ดูพนักงาน"]} />;
+  useEffect(() => {
+    if (initialDepartments && initialDepartments.length > 0) {
+      setDeptList(initialDepartments);
+    }
+  }, [initialDepartments]);
+
+  const [search, setSearch] = useState("");
+  const [filterStatus, setFilterStatus] = useState("ALL");
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<any | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [formData, setFormData] = useState({
+    name: "",
+    description: "",
+    isActive: true,
+  });
+
+  const handleOpenAdd = () => {
+    setEditingItem(null);
+    setFormData({
+      name: "",
+      description: "",
+      isActive: true,
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEdit = (dept: any) => {
+    setEditingItem(dept);
+    const activeState = dept.isActive ?? (dept.status === "ACTIVE");
+    setFormData({
+      name: dept.name || "",
+      description: dept.description || "",
+      isActive: activeState,
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleToggleStatus = async (dept: any) => {
+    const nextIsActive = !(dept.isActive ?? (dept.status === "ACTIVE"));
+    const nextStatus = nextIsActive ? "ACTIVE" : "INACTIVE";
+
+    if (companyId) {
+      try {
+        const res = await fetch(`/api/company/${companyId}/departments/${dept.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: dept.name,
+            description: dept.description,
+            isActive: nextIsActive,
+          }),
+        }).then((r) => r.json());
+
+        if (res.ok && res.data) {
+          setDeptList((prev) =>
+            prev.map((item) => (item.id === dept.id ? { ...res.data, status: nextStatus } : item))
+          );
+        } else {
+          alert(res.message || "เกิดข้อผิดพลาดในการเปลี่ยนสถานะ");
+        }
+      } catch (err: any) {
+        alert("เกิดข้อผิดพลาด: " + err.message);
+      }
+    } else {
+      setDeptList((prev) =>
+        prev.map((item) =>
+          item.id === dept.id
+            ? { ...item, isActive: nextIsActive, status: nextStatus }
+            : item
+        )
+      );
+    }
+  };
+
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!formData.name.trim()) {
+      alert("กรุณากรอกชื่อแผนก");
+      return;
+    }
+
+    setIsSubmitting(true);
+    const payload = {
+      name: formData.name.trim(),
+      description: formData.description ? formData.description.trim() : undefined,
+      isActive: formData.isActive,
+    };
+
+    if (companyId) {
+      try {
+        let res;
+        if (editingItem) {
+          res = await fetch(`/api/company/${companyId}/departments/${editingItem.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          }).then((r) => r.json());
+        } else {
+          res = await fetch(`/api/company/${companyId}/departments`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          }).then((r) => r.json());
+        }
+
+        if (res.ok && res.data) {
+          const saved = res.data;
+          const formatted = {
+            ...saved,
+            status: saved.isActive ? "ACTIVE" : "INACTIVE",
+            _count: saved._count || editingItem?._count || { users: 0, employees: 0 },
+          };
+          if (editingItem) {
+            setDeptList((prev) => prev.map((item) => (item.id === editingItem.id ? formatted : item)));
+          } else {
+            setDeptList((prev) => [formatted, ...prev]);
+          }
+          setIsModalOpen(false);
+        } else {
+          alert(res.message || "เกิดข้อผิดพลาดในการบันทึกข้อมูล");
+        }
+      } catch (err: any) {
+        alert("เกิดข้อผิดพลาด: " + err.message);
+      } finally {
+        setIsSubmitting(false);
+      }
+    } else {
+      const nextStatus = formData.isActive ? "ACTIVE" : "INACTIVE";
+      if (editingItem) {
+        const updated = {
+          ...editingItem,
+          name: formData.name,
+          description: formData.description,
+          isActive: formData.isActive,
+          status: nextStatus,
+        };
+        setDeptList((prev) => prev.map((item) => (item.id === editingItem.id ? updated : item)));
+      } else {
+        const newItem = {
+          id: `dept-${Date.now()}`,
+          name: formData.name,
+          description: formData.description,
+          isActive: formData.isActive,
+          status: nextStatus,
+          users: 0,
+          employees: 0,
+          _count: { users: 0, employees: 0 },
+        };
+        setDeptList((prev) => [newItem, ...prev]);
+      }
+      setIsSubmitting(false);
+      setIsModalOpen(false);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletingId) return;
+    setIsSubmitting(true);
+
+    if (companyId) {
+      try {
+        const res = await fetch(`/api/company/${companyId}/departments/${deletingId}`, {
+          method: "DELETE",
+        }).then((r) => r.json());
+
+        if (res.ok) {
+          setDeptList((prev) => prev.filter((item) => item.id !== deletingId));
+          setDeletingId(null);
+        } else {
+          alert(res.message || "เกิดข้อผิดพลาดในการลบข้อมูล");
+        }
+      } catch (err: any) {
+        alert("เกิดข้อผิดพลาด: " + err.message);
+      } finally {
+        setIsSubmitting(false);
+      }
+    } else {
+      setDeptList((prev) => prev.filter((item) => item.id !== deletingId));
+      setDeletingId(null);
+      setIsSubmitting(false);
+    }
+  };
+
+  const filteredDepartments = deptList.filter((dept) => {
+    const q = search.toLowerCase().trim();
+    const matchesSearch =
+      !q ||
+      (dept.name && dept.name.toLowerCase().includes(q)) ||
+      (dept.description && dept.description.toLowerCase().includes(q));
+
+    const activeState = dept.isActive ?? (dept.status === "ACTIVE");
+    const matchesStatus =
+      filterStatus === "ALL" ||
+      (filterStatus === "ACTIVE" && activeState) ||
+      (filterStatus === "INACTIVE" && !activeState);
+
+    return matchesSearch && matchesStatus;
+  });
+
+  return (
+    <div className="space-y-4">
+      {/* Toolbar */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={handleOpenAdd}
+            className="inline-flex h-10 items-center gap-1.5 rounded-md bg-teal-600 px-3.5 text-xs font-semibold text-white hover:bg-teal-700 transition shadow-sm"
+          >
+            <Plus className="size-4" />
+            เพิ่มแผนก
+          </button>
+        </div>
+
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="ค้นหาชื่อแผนก หรือรายละเอียด"
+              className="h-10 w-full rounded-md border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-900 outline-none transition focus:border-teal-500 focus:ring-1 focus:ring-teal-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 sm:w-64"
+            />
+          </div>
+
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="h-10 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
+          >
+            <option value="ALL">สถานะทั้งหมด</option>
+            <option value="ACTIVE">ACTIVE</option>
+            <option value="INACTIVE">INACTIVE</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+        <table className="w-full min-w-[800px] text-left text-sm">
+          <thead className="text-xs uppercase text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-slate-800">
+            <tr>
+              <th className="py-3 pr-4 font-semibold">ชื่อแผนก</th>
+              <th className="py-3 pr-4 font-semibold">รายละเอียด</th>
+              <th className="py-3 pr-4 font-semibold">สถานะ</th>
+              <th className="py-3 pr-4 font-semibold">ผู้ใช้งาน</th>
+              <th className="py-3 pr-4 font-semibold">พนักงาน</th>
+              <th className="py-3 font-semibold text-right">จัดการ</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            {filteredDepartments.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="py-8 text-center text-slate-500">
+                  ไม่พบข้อมูลแผนก
+                </td>
+              </tr>
+            ) : (
+              filteredDepartments.map((dept) => {
+                const activeState = dept.isActive ?? (dept.status === "ACTIVE");
+                const statusStr = activeState ? "ACTIVE" : "INACTIVE";
+                const userCount = (() => {
+                  if (initialUsers && initialUsers.length > 0) {
+                    return initialUsers.filter((u: any) => {
+                      if (u.departmentId && dept.id && u.departmentId === dept.id) return true;
+                      const deptName = u.department?.name || (typeof u.department === "string" ? u.department : "");
+                      return deptName && deptName === dept.name;
+                    }).length;
+                  }
+                  return dept._count?.users ?? dept.users ?? 0;
+                })();
+                const employeeCount = (() => {
+                  if (initialEmployees && initialEmployees.length > 0) {
+                    return initialEmployees.filter((emp: any) => {
+                      if (emp.departmentId && dept.id && emp.departmentId === dept.id) return true;
+                      const deptName = emp.department?.name || (typeof emp.department === "string" ? emp.department : "");
+                      return deptName && deptName === dept.name;
+                    }).length;
+                  }
+                  return dept._count?.employees ?? dept.employees ?? 0;
+                })();
+
+                return (
+                  <tr key={dept.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/50">
+                    <td className="py-4 pr-4 font-semibold text-slate-950 dark:text-slate-100">{dept.name}</td>
+                    <td className="py-4 pr-4 text-slate-600 dark:text-slate-400 max-w-xs truncate">{dept.description || "-"}</td>
+                    <td className="py-4 pr-4">
+                      <Status value={statusStr} />
+                    </td>
+                    <td className="py-4 pr-4 text-slate-700 dark:text-slate-300 font-medium">{userCount}</td>
+                    <td className="py-4 pr-4 text-slate-700 dark:text-slate-300 font-medium">{employeeCount}</td>
+                    <td className="py-4 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          onClick={() => handleToggleStatus(dept)}
+                          title="เปิด/ปิดสถานะแผนก"
+                          className={`inline-flex h-8 items-center gap-1 rounded-md border px-2.5 text-xs font-medium transition ${activeState
+                              ? "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-300"
+                              : "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300"
+                            }`}
+                        >
+                          {activeState ? "ปิดใช้งาน" : "เปิดใช้งาน"}
+                        </button>
+                        <button
+                          onClick={() => handleOpenEdit(dept)}
+                          className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 transition"
+                        >
+                          <Pencil className="size-3.5" />
+                          แก้ไข
+                        </button>
+                        <button
+                          onClick={() => setDeletingId(dept.id)}
+                          className="inline-flex h-8 items-center gap-1 rounded-md border border-rose-200 bg-rose-50 px-2.5 text-xs font-medium text-rose-700 hover:bg-rose-100 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-400 transition"
+                        >
+                          <Trash2 className="size-3.5" />
+                          ลบ
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Add / Edit Form Modal */}
+      <FormModal
+        open={isModalOpen}
+        title={editingItem ? "แก้ไขข้อมูลแผนก" : "เพิ่มแผนกใหม่"}
+        description={editingItem ? `แก้ไขรายละเอียดของแผนก ${editingItem.name}` : "กรอกชื่อแผนกและรายละเอียดที่ต้องการเพิ่ม"}
+        onClose={() => setIsModalOpen(false)}
+        onSubmit={() => handleSubmit()}
+      >
+        <form onSubmit={handleSubmit} className="space-y-4 text-left">
+          <label className="block">
+            <span className="text-xs font-medium text-slate-700 dark:text-slate-300">ชื่อแผนก <span className="text-rose-500">*</span></span>
+            <input
+              type="text"
+              required
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              placeholder="เช่น ฝ่ายบัญชีและการเงิน"
+              className="mt-1 h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-teal-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+            />
+          </label>
+
+          <label className="block">
+            <span className="text-xs font-medium text-slate-700 dark:text-slate-300">รายละเอียดแผนก</span>
+            <textarea
+              rows={3}
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              placeholder="อธิบายหน้าที่หรือรายละเอียดของแผนกนี้"
+              className="mt-1 w-full rounded-md border border-slate-200 bg-white p-3 text-sm outline-none transition focus:border-teal-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+            />
+          </label>
+
+          <label className="flex items-center gap-2 cursor-pointer pt-1">
+            <input
+              type="checkbox"
+              checked={formData.isActive}
+              onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
+              className="size-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
+            />
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">เปิดใช้งานแผนกนี้ (Active)</span>
+          </label>
+        </form>
+      </FormModal>
+
+      {/* Confirm Delete Dialog */}
+      <ConfirmDialog
+        open={!!deletingId}
+        title="ยืนยันการลบแผนก"
+        description="คุณแน่ใจหรือไม่ว่าต้องการลบแผนกนี้? ข้อมูลจะถูกลบออกจากระบบและไม่สามารถย้อนกลับได้"
+        confirmText={isSubmitting ? "กำลังลบ..." : "ยืนยันลบ"}
+        cancelText="ยกเลิก"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeletingId(null)}
+      />
+    </div>
+  );
 }
 
 function ApprovalFlows({ data, companyId }: { data?: any; companyId?: string }) {
@@ -1176,7 +1967,7 @@ function ApprovalFlows({ data, companyId }: { data?: any; companyId?: string }) 
       {/* Header toolbar */}
       <div className="flex justify-between items-center">
         <h2 className="font-semibold text-lg text-slate-950 dark:text-white">รายการ Flow การอนุมัติทั้งหมด</h2>
-        <button 
+        <button
           onClick={openAddFlow}
           className="inline-flex h-9 items-center gap-1.5 rounded-md bg-teal-600 px-4 text-xs font-semibold text-white hover:bg-teal-700 cursor-pointer"
         >
@@ -1201,7 +1992,7 @@ function ApprovalFlows({ data, companyId }: { data?: any; companyId?: string }) 
                 <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                   Document Type: <span className="font-medium text-slate-700 dark:text-slate-300">{flow.documentType?.name || "ไม่ระบุ"}</span>
                 </p>
-                
+
                 {/* Steps badge list */}
                 <div className="mt-4 flex flex-wrap gap-2 items-center">
                   {flow.steps.map((step: any, i: number) => (
@@ -1242,12 +2033,12 @@ function ApprovalFlows({ data, companyId }: { data?: any; companyId?: string }) 
             <h3 className="font-bold text-lg text-slate-950 dark:text-white">
               {editingFlow ? "แก้ไข Flow การอนุมัติ" : "เพิ่ม Flow การอนุมัติใหม่"}
             </h3>
-            
+
             <div className="mt-4 space-y-4 overflow-y-auto pr-1 flex-1">
               <div>
                 <label className="block text-xs font-semibold text-slate-500 mb-1">ชื่อ Flow *</label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={flowName}
                   onChange={(e) => setFlowName(e.target.value)}
                   placeholder="เช่น อนุมัติใบเสนอราคาเริ่มต้น"
@@ -1271,8 +2062,8 @@ function ApprovalFlows({ data, companyId }: { data?: any; companyId?: string }) 
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 mb-1">สถานะ</label>
                   <div className="flex items-center gap-2 mt-2">
-                    <input 
-                      type="checkbox" 
+                    <input
+                      type="checkbox"
                       id="flow-active"
                       checked={isActive}
                       onChange={(e) => setIsActive(e.target.checked)}
@@ -1287,7 +2078,7 @@ function ApprovalFlows({ data, companyId }: { data?: any; companyId?: string }) 
               <div className="border-t border-slate-100 dark:border-slate-800 pt-4">
                 <div className="flex justify-between items-center mb-2">
                   <label className="block text-xs font-semibold text-slate-500">ลำดับขั้นตอนการอนุมัติ *</label>
-                  <button 
+                  <button
                     type="button"
                     onClick={addFormStep}
                     className="inline-flex items-center gap-1 text-xs font-bold text-teal-600 hover:text-teal-700 cursor-pointer"
@@ -1310,7 +2101,7 @@ function ApprovalFlows({ data, companyId }: { data?: any; companyId?: string }) 
                           <option key={r} value={r}>{r}</option>
                         ))}
                       </select>
-                      <button 
+                      <button
                         type="button"
                         onClick={() => removeFormStep(idx)}
                         className="p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-rose-600 shrink-0 cursor-pointer"
@@ -1325,8 +2116,8 @@ function ApprovalFlows({ data, companyId }: { data?: any; companyId?: string }) 
 
             <div className="mt-6 flex justify-end gap-2 shrink-0">
               <button onClick={() => setIsOpen(false)} className="h-9 rounded-md border border-slate-200 px-4 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:text-slate-300 cursor-pointer">ยกเลิก</button>
-              <button 
-                onClick={handleSave} 
+              <button
+                onClick={handleSave}
                 disabled={isPending}
                 className="h-9 rounded-md bg-teal-600 px-4 text-xs font-semibold text-white hover:bg-teal-700 disabled:opacity-50 cursor-pointer"
               >
@@ -1379,7 +2170,7 @@ function Approvals({ data, companyId, compact = false }: { data?: any; companyId
 
   const submitAction = () => {
     if (!selectedApproval || !actionType) return;
-    
+
     startTransition(async () => {
       try {
         const res = await fetch(`/api/approvals/${selectedApproval.id}/${actionType}`, {
@@ -1387,19 +2178,19 @@ function Approvals({ data, companyId, compact = false }: { data?: any; companyId
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ note: actionNote })
         });
-        
+
         const resData = await res.json();
         if (resData.ok) {
           // Update state locally
-          setApprovalsList(prev => prev.map(a => 
-            a.id === selectedApproval.id 
-              ? { ...a, status: actionType === "approve" ? "APPROVED" : "REJECTED", note: actionNote, actionAt: new Date().toISOString() } 
+          setApprovalsList(prev => prev.map(a =>
+            a.id === selectedApproval.id
+              ? { ...a, status: actionType === "approve" ? "APPROVED" : "REJECTED", note: actionNote, actionAt: new Date().toISOString() }
               : a
           ));
           setSelectedApproval(null);
           setActionType(null);
           setActionNote("");
-          
+
           // Force reload to update document status in other parts
           window.location.reload();
         } else {
@@ -1417,21 +2208,19 @@ function Approvals({ data, companyId, compact = false }: { data?: any; companyId
       <div className="flex border-b border-slate-200 dark:border-slate-800">
         <button
           onClick={() => setActiveTab("pending")}
-          className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all cursor-pointer ${
-            activeTab === "pending"
+          className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all cursor-pointer ${activeTab === "pending"
               ? "border-teal-600 text-teal-600 dark:text-teal-400"
               : "border-transparent text-slate-500 hover:text-slate-700"
-          }`}
+            }`}
         >
           งานที่รออนุมัติ ({pendingApprovals.length})
         </button>
         <button
           onClick={() => setActiveTab("history")}
-          className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all cursor-pointer ${
-            activeTab === "history"
+          className={`px-4 py-2.5 text-sm font-semibold border-b-2 transition-all cursor-pointer ${activeTab === "history"
               ? "border-teal-600 text-teal-600 dark:text-teal-400"
               : "border-transparent text-slate-500 hover:text-slate-700"
-          }`}
+            }`}
         >
           ประวัติการดำเนินการ ({historyApprovals.length})
         </button>
@@ -1490,11 +2279,10 @@ function Approvals({ data, companyId, compact = false }: { data?: any; companyId
                 <div key={app.id} className="rounded-lg border border-slate-100 bg-white p-4 dark:border-slate-800 dark:bg-slate-900/10 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <span className={`text-[10px] font-bold uppercase tracking-wider rounded px-2 py-0.5 ${
-                        app.status === "APPROVED"
+                      <span className={`text-[10px] font-bold uppercase tracking-wider rounded px-2 py-0.5 ${app.status === "APPROVED"
                           ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
                           : "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300"
-                      }`}>
+                        }`}>
                         {app.status === "APPROVED" ? "อนุมัติแล้ว" : "ปฏิเสธแล้ว"}
                       </span>
                       <span className="text-[10px] text-slate-400">Step {app.stepOrder}</span>
@@ -1549,8 +2337,8 @@ function Approvals({ data, companyId, compact = false }: { data?: any; companyId
             </div>
             <div className="mt-6 flex justify-end gap-2">
               <button onClick={() => { setSelectedApproval(null); setActionType(null); }} className="h-9 rounded-md border border-slate-200 px-4 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:text-slate-300 cursor-pointer">ยกเลิก</button>
-              <button 
-                onClick={submitAction} 
+              <button
+                onClick={submitAction}
                 disabled={isPending || (actionType === "reject" && !actionNote.trim())}
                 className={`h-9 rounded-md px-4 text-xs font-semibold text-white cursor-pointer ${actionType === "approve" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-rose-600 hover:bg-rose-700"} disabled:opacity-50`}
               >
@@ -1663,7 +2451,7 @@ function NumberSettings({ data, companyId }: { data?: any; companyId?: string })
     const yy = date.getFullYear().toString();
     const mm = (date.getMonth() + 1).toString().padStart(2, "0");
     const suffix = num.toString().padStart(pad, "0");
-    
+
     if (mode === "YEARLY") return `${pref}-${yy}-${suffix}`;
     if (mode === "MONTHLY") return `${pref}-${yy}${mm}-${suffix}`;
     return `${pref}-${suffix}`;
@@ -1673,7 +2461,7 @@ function NumberSettings({ data, companyId }: { data?: any; companyId?: string })
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="font-semibold text-lg text-slate-950 dark:text-white font-sans">ตั้งค่ารูปแบบเลขที่เอกสาร</h2>
-        <button 
+        <button
           onClick={openAddSetting}
           className="inline-flex h-9 items-center gap-1.5 rounded-md bg-teal-600 px-4 text-xs font-semibold text-white hover:bg-teal-700 cursor-pointer"
         >
@@ -1733,7 +2521,7 @@ function NumberSettings({ data, companyId }: { data?: any; companyId?: string })
             <h3 className="font-bold text-lg text-slate-950 dark:text-white">
               {editingSetting ? "แก้ไขรูปแบบเลขที่เอกสาร" : "เพิ่มรูปแบบเลขที่เอกสารใหม่"}
             </h3>
-            
+
             <div className="mt-4 space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-500 mb-1">ประเภทเอกสาร *</label>
@@ -1751,8 +2539,8 @@ function NumberSettings({ data, companyId }: { data?: any; companyId?: string })
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 mb-1">Prefix (คำนำหน้า) *</label>
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     value={prefix}
                     onChange={(e) => setPrefix(e.target.value)}
                     placeholder="เช่น INV, QT"
@@ -1761,8 +2549,8 @@ function NumberSettings({ data, companyId }: { data?: any; companyId?: string })
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 mb-1">จำนวนหลักตัวเลข *</label>
-                  <input 
-                    type="number" 
+                  <input
+                    type="number"
                     value={padding}
                     min={3}
                     max={8}
@@ -1775,8 +2563,8 @@ function NumberSettings({ data, companyId }: { data?: any; companyId?: string })
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 mb-1">เลขเริ่มต้น *</label>
-                  <input 
-                    type="number" 
+                  <input
+                    type="number"
                     value={runningNum}
                     min={1}
                     onChange={(e) => setRunningNum(Number(e.target.value))}
@@ -1809,8 +2597,8 @@ function NumberSettings({ data, companyId }: { data?: any; companyId?: string })
 
             <div className="mt-6 flex justify-end gap-2">
               <button onClick={() => setIsOpen(false)} className="h-9 rounded-md border border-slate-200 px-4 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:text-slate-300 cursor-pointer">ยกเลิก</button>
-              <button 
-                onClick={handleSave} 
+              <button
+                onClick={handleSave}
                 disabled={isPending}
                 className="h-9 rounded-md bg-teal-600 px-4 text-xs font-semibold text-white hover:bg-teal-700 disabled:opacity-50 cursor-pointer"
               >
@@ -1890,74 +2678,74 @@ function SettingsCompany({ data, companyId }: { data?: any; companyId?: string }
       <div className="grid gap-4 md:grid-cols-2">
         <label className="block">
           <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">ชื่อบริษัท *</span>
-          <input 
-            value={name} 
-            onChange={(e) => setName(e.target.value)} 
-            className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm dark:border-slate-800 dark:bg-slate-900" 
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm dark:border-slate-800 dark:bg-slate-900"
           />
         </label>
         <label className="block">
           <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">เบอร์โทรศัพท์</span>
-          <input 
-            value={phone} 
-            onChange={(e) => setPhone(e.target.value)} 
-            className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm dark:border-slate-800 dark:bg-slate-900" 
+          <input
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm dark:border-slate-800 dark:bg-slate-900"
           />
         </label>
         <label className="block">
           <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">เลขประจำตัวผู้เสียภาษี (Tax ID)</span>
-          <input 
-            value={taxId} 
-            onChange={(e) => setTaxId(e.target.value)} 
-            className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm dark:border-slate-800 dark:bg-slate-900" 
+          <input
+            value={taxId}
+            onChange={(e) => setTaxId(e.target.value)}
+            className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm dark:border-slate-800 dark:bg-slate-900"
           />
         </label>
         <label className="block">
           <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">ลักษณะ/ประเภทธุรกิจ</span>
-          <input 
-            value={businessType} 
-            onChange={(e) => setBusinessType(e.target.value)} 
-            className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm dark:border-slate-800 dark:bg-slate-900" 
+          <input
+            value={businessType}
+            onChange={(e) => setBusinessType(e.target.value)}
+            className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm dark:border-slate-800 dark:bg-slate-900"
           />
         </label>
         <label className="block md:col-span-2">
           <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">ที่อยู่บริษัท</span>
-          <textarea 
-            value={address} 
-            onChange={(e) => setAddress(e.target.value)} 
+          <textarea
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
             rows={3}
-            className="mt-1 w-full rounded-md border border-slate-200 p-3 text-sm dark:border-slate-800 dark:bg-slate-900" 
+            className="mt-1 w-full rounded-md border border-slate-200 p-3 text-sm dark:border-slate-800 dark:bg-slate-900"
           />
         </label>
         <label className="block">
           <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">ลิงก์โลโก้บริษัท (Logo URL)</span>
-          <input 
-            value={logoUrl} 
-            onChange={(e) => setLogoUrl(e.target.value)} 
-            className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm dark:border-slate-800 dark:bg-slate-900" 
+          <input
+            value={logoUrl}
+            onChange={(e) => setLogoUrl(e.target.value)}
+            className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm dark:border-slate-800 dark:bg-slate-900"
           />
         </label>
         <label className="block">
           <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">ลิงกลายเซ็น (Signature URL)</span>
-          <input 
-            value={signatureUrl} 
-            onChange={(e) => setSignatureUrl(e.target.value)} 
-            className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm dark:border-slate-800 dark:bg-slate-900" 
+          <input
+            value={signatureUrl}
+            onChange={(e) => setSignatureUrl(e.target.value)}
+            className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm dark:border-slate-800 dark:bg-slate-900"
           />
         </label>
         <label className="block">
           <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">อัตราภาษีมูลค่าเพิ่ม (%) (VAT Rate)</span>
-          <input 
-            value={vatRate} 
-            onChange={(e) => setVatRate(e.target.value)} 
-            className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm dark:border-slate-800 dark:bg-slate-900" 
+          <input
+            value={vatRate}
+            onChange={(e) => setVatRate(e.target.value)}
+            className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm dark:border-slate-800 dark:bg-slate-900"
           />
         </label>
         <label className="block">
           <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">ขนาดกระดาษเริ่มต้น (Paper Size)</span>
-          <select 
-            value={paperSize} 
-            onChange={(e) => setPaperSize(e.target.value)} 
+          <select
+            value={paperSize}
+            onChange={(e) => setPaperSize(e.target.value)}
             className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm dark:border-slate-800 dark:bg-slate-900"
           >
             <option value="A4">A4</option>
@@ -1966,9 +2754,9 @@ function SettingsCompany({ data, companyId }: { data?: any; companyId?: string }
           </select>
         </label>
       </div>
-      
-      <button 
-        onClick={handleSave} 
+
+      <button
+        onClick={handleSave}
         disabled={isPending}
         className="inline-flex h-10 items-center gap-2 rounded-md bg-teal-600 px-5 text-sm font-semibold text-white hover:bg-teal-700 disabled:opacity-50 cursor-pointer"
       >
@@ -2121,7 +2909,7 @@ function SettingsUsers({ data, companyId }: { data?: any; companyId?: string }) 
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="font-semibold text-lg text-slate-950 dark:text-white">รายการผู้ใช้งานในระบบ</h2>
-        <button 
+        <button
           onClick={openAddUser}
           className="inline-flex h-9 items-center gap-1.5 rounded-md bg-teal-600 px-4 text-xs font-semibold text-white hover:bg-teal-700 cursor-pointer"
         >
@@ -2180,12 +2968,12 @@ function SettingsUsers({ data, companyId }: { data?: any; companyId?: string }) 
             <h3 className="font-bold text-lg text-slate-950 dark:text-white">
               {editingUser ? "แก้ไขผู้ใช้งาน" : "เพิ่มผู้ใช้งานใหม่"}
             </h3>
-            
+
             <div className="mt-4 space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-500 mb-1">ชื่อ-สกุล *</label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="เช่น สมชาย ใจดี"
@@ -2195,8 +2983,8 @@ function SettingsUsers({ data, companyId }: { data?: any; companyId?: string }) 
 
               <div>
                 <label className="block text-xs font-semibold text-slate-500 mb-1">อีเมล *</label>
-                <input 
-                  type="email" 
+                <input
+                  type="email"
                   value={email}
                   disabled={!!editingUser}
                   onChange={(e) => setEmail(e.target.value)}
@@ -2241,8 +3029,8 @@ function SettingsUsers({ data, companyId }: { data?: any; companyId?: string }) 
 
             <div className="mt-6 flex justify-end gap-2">
               <button onClick={() => setIsOpen(false)} className="h-9 rounded-md border border-slate-200 px-4 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:text-slate-300 cursor-pointer">ยกเลิก</button>
-              <button 
-                onClick={handleSave} 
+              <button
+                onClick={handleSave}
                 disabled={isPending}
                 className="h-9 rounded-md bg-teal-600 px-4 text-xs font-semibold text-white hover:bg-teal-700 disabled:opacity-50 cursor-pointer"
               >
@@ -2308,8 +3096,8 @@ export function CompanyWorkspace({ section, data, companyId }: { section: Compan
         {section === "designer" && <Designer />}
         {section === "fields" && <Fields />}
         {section === "business-partners" && <><Toolbar placeholder="ค้นหาลูกค้า / คู่ค้า" filters={["CUSTOMER / VENDOR"]} actions={[]} /><BusinessPartners /></>}
-        {section === "employees" && <><Toolbar placeholder="ค้นหาพนักงาน" filters={["แผนก", "สถานะ"]} actions={[]} /><Employees /></>}
-        {section === "departments" && <Departments />}
+        {section === "employees" && <EmployeeManagement initialEmployees={data?.employees} departments={data?.departments} companyId={companyId} />}
+        {section === "departments" && <DepartmentManagement initialDepartments={data?.departments} companyId={companyId} />}
         {section === "approval-flows" && <ApprovalFlows data={data} companyId={companyId} />}
         {section === "approvals" && <Approvals data={data} companyId={companyId} />}
         {section === "document-number-settings" && <NumberSettings data={data} companyId={companyId} />}

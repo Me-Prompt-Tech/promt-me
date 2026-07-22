@@ -158,6 +158,114 @@ async function main() {
     console.log(`System Admin already exists: ${adminEmail}`);
   }
 
+  // 14.5 Default Company, Departments, and Employees
+  const companyId = '668f191e810c19729de860ea';
+  let company = await prisma.company.findUnique({
+    where: { id: companyId }
+  });
+
+  if (!company) {
+    company = await prisma.company.create({
+      data: {
+        id: companyId,
+        name: 'Siam Retail Co., Ltd.',
+        legalName: 'บริษัท สยาม รีเทล จำกัด',
+        taxId: '0105566000001',
+        branchCode: '00000',
+        email: 'info@siamretail.example.com',
+        phone: '02-123-4567',
+        address: '88/1 ถนนสุขุมวิท กรุงเทพมหานคร 10110',
+        status: 'ACTIVE',
+      }
+    });
+    console.log(`Created default Company: ${company.name}`);
+  }
+
+  // Create default departments
+  const deptData = [
+    { id: '668f191e810c19729de860d1', name: 'บัญชี', description: 'ฝ่ายบัญชีและการเงินหลัก' },
+    { id: '668f191e810c19729de860d2', name: 'การเงิน', description: 'ฝ่ายการเงิน วางแผนงบประมาณ' },
+    { id: '668f191e810c19729de860d3', name: 'บุคคล', description: 'ฝ่ายบริหารทรัพยากรบุคคล (HR)' },
+    { id: '668f191e810c19729de860d4', name: 'ปฏิบัติการ', description: 'ฝ่ายปฏิบัติการและคลังสินค้า' },
+  ];
+
+  for (const d of deptData) {
+    const existingDept = await prisma.department.findFirst({
+      where: { companyId, name: d.name }
+    });
+
+    if (!existingDept) {
+      await prisma.department.create({
+        data: {
+          id: d.id,
+          companyId,
+          name: d.name,
+          description: d.description,
+          isActive: true,
+        }
+      });
+      console.log(`Created department: ${d.name}`);
+    }
+  }
+
+  // Fetch departments to link employees correctly
+  const acctDept = await prisma.department.findFirst({ where: { companyId, name: 'บัญชี' } });
+  const finDept = await prisma.department.findFirst({ where: { companyId, name: 'การเงิน' } });
+  const opsDept = await prisma.department.findFirst({ where: { companyId, name: 'ปฏิบัติการ' } });
+
+  // Create default employees
+  const employeesData = [
+    {
+      code: 'EMP-001',
+      name: 'คุณวราภรณ์',
+      email: 'accountant@example.com',
+      phone: '081-111-2233',
+      position: 'Senior Accountant',
+      departmentId: acctDept?.id,
+      salarySatang: 5800000,
+      startDate: new Date('2024-01-01'),
+      status: 'ACTIVE' as const,
+    },
+    {
+      code: 'EMP-002',
+      name: 'คุณอรทัย',
+      email: 'finance@example.com',
+      phone: '082-444-9988',
+      position: 'Finance Manager',
+      departmentId: finDept?.id,
+      salarySatang: 7200000,
+      startDate: new Date('2023-03-15'),
+      status: 'ACTIVE' as const,
+    },
+    {
+      code: 'EMP-003',
+      name: 'คุณกิตติ',
+      email: 'operation@example.com',
+      phone: '083-555-1122',
+      position: 'Operation Lead',
+      departmentId: opsDept?.id,
+      salarySatang: 4900000,
+      startDate: new Date('2025-06-01'),
+      status: 'ACTIVE' as const,
+    },
+  ];
+
+  for (const emp of employeesData) {
+    const existingEmp = await prisma.employee.findFirst({
+      where: { companyId, code: emp.code }
+    });
+
+    if (!existingEmp) {
+      await prisma.employee.create({
+        data: {
+          companyId,
+          ...emp,
+        }
+      });
+      console.log(`Created employee: ${emp.name} (${emp.code})`);
+    }
+  }
+
   console.log('Seeding finished.');
 }
 
