@@ -541,7 +541,253 @@ function Timeline({ title, items }: { title: string; items: string[] }) {
 }
 
 function Templates() {
-  return <div className="grid gap-4 md:grid-cols-3">{templates.map((t) => <div key={t.name} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm"><LayoutIcon /><h2 className="mt-3 font-semibold">{t.name}</h2><p className="text-sm text-slate-500">{t.source} · {t.category} · {t.type}</p><div className="mt-3"><Status value={t.status} /></div><div className="mt-4 flex flex-wrap gap-1.5">{["แก้ไข", "ลบ", "Duplicate", "Preview", "Designer"].map((a) => <ActionButton key={a} label={a} />)}</div></div>)}</div>;
+  const [data, setData] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingItem, setEditingItem] = useState<any>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/templates")
+      .then(res => res.json())
+      .then(res => {
+        if (res.ok && res.data) {
+          setData(res.data);
+        } else {
+          // Fallback to static mock data if API fails or is empty
+          setData(templates.map((t, i) => ({ ...t, id: `mock-${i}` })));
+        }
+        setIsLoading(false);
+      })
+      .catch(() => {
+        setData(templates.map((t, i) => ({ ...t, id: `mock-${i}` })));
+        setIsLoading(false);
+      });
+  }, []);
+
+  const initialForm = {
+    name: "",
+    categoryId: "",
+    documentTypeId: "",
+    status: "Active",
+    layoutJson: "{}"
+  };
+  const [formData, setFormData] = useState(initialForm);
+
+  const handleAdd = () => {
+    setFormData(initialForm);
+    setEditingItem(null);
+    setIsEditing(true);
+  };
+
+  const handleEdit = (item: any) => {
+    setFormData({
+      name: item.name || "",
+      categoryId: item.categoryId || "",
+      documentTypeId: item.documentTypeId || "",
+      status: item.status || "Active",
+      layoutJson: typeof item.layoutJson === 'string' ? item.layoutJson : JSON.stringify(item.layoutJson || {})
+    });
+    setEditingItem(item);
+    setIsEditing(true);
+  };
+
+  const handleDelete = (item: any) => {
+    setDeleteId(item.id);
+  };
+
+  const confirmDelete = async () => {
+    if (deleteId) {
+      if (deleteId.startsWith('mock-')) {
+        setData(data.filter(item => item.id !== deleteId));
+      } else {
+        try {
+          const res = await fetch(`/api/templates/${deleteId}`, { method: "DELETE" }).then(r => r.json());
+          if (res.ok) {
+            setData(data.filter(item => item.id !== deleteId));
+          } else {
+            alert("Error: " + (res.message || "Failed to delete"));
+          }
+        } catch (err) {
+          alert("Error deleting template");
+        }
+      }
+      setDeleteId(null);
+    }
+  };
+
+  const handleDuplicate = async (item: any) => {
+    const newItem = { ...item, name: `${item.name} (Copy)` };
+    delete newItem.id;
+    
+    try {
+      const res = await fetch("/api/templates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newItem)
+      }).then(r => r.json());
+      
+      if (res.ok) {
+        setData([res.data, ...data]);
+      } else {
+        setData([{ ...newItem, id: `mock-${Date.now()}` }, ...data]);
+      }
+    } catch (err) {
+      setData([{ ...newItem, id: `mock-${Date.now()}` }, ...data]);
+    }
+  };
+
+  const handleToggleStatus = async (item: any) => {
+    const newStatus = item.status === "Active" ? "Inactive" : "Active";
+    if (item.id.startsWith('mock-')) {
+      setData(data.map(d => d.id === item.id ? { ...d, status: newStatus } : d));
+    } else {
+      try {
+        const res = await fetch(`/api/templates/${item.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: newStatus })
+        }).then(r => r.json());
+        
+        if (res.ok) {
+          setData(data.map(d => d.id === item.id ? { ...d, status: newStatus } : d));
+        }
+      } catch (err) {
+        alert("Error updating status");
+      }
+    }
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSaving(true);
+    
+    let parsedLayout = {};
+    try {
+      parsedLayout = JSON.parse(formData.layoutJson);
+    } catch (e) {
+      parsedLayout = {};
+    }
+
+    const payload = { ...formData, layoutJson: parsedLayout };
+    
+    try {
+      if (editingItem && editingItem.id && !editingItem.id.startsWith('mock-')) {
+        const res = await fetch(`/api/templates/${editingItem.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        }).then(r => r.json());
+        
+        if (res.ok) {
+          setData(data.map(item => item.id === editingItem.id ? res.data : item));
+          setIsEditing(false);
+        } else {
+          alert("Error: " + (res.message || "Failed to update"));
+        }
+      } else if (editingItem && editingItem.id.startsWith('mock-')) {
+        setData(data.map(item => item.id === editingItem.id ? { ...item, ...payload } : item));
+        setIsEditing(false);
+      } else {
+        const res = await fetch("/api/templates", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        }).then(r => r.json());
+        
+        if (res.ok) {
+          setData([res.data, ...data]);
+          setIsEditing(false);
+        } else {
+          setData([{ ...payload, id: `mock-${Date.now()}` }, ...data]);
+          setIsEditing(false);
+        }
+      }
+    } catch (err) {
+      setData([{ ...payload, id: `mock-${Date.now()}` }, ...data]);
+      setIsEditing(false);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (isEditing) {
+    return (
+      <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+        <h2 className="text-xl font-semibold mb-4">{editingItem ? "แก้ไข Template" : "เพิ่ม Template ใหม่"}</h2>
+        <form onSubmit={handleSave} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <label className="block md:col-span-2">
+              <span className="text-sm font-medium">ชื่อ Template</span>
+              <input required className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm dark:border-slate-700 dark:bg-slate-900" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} />
+            </label>
+            <label className="block">
+              <span className="text-sm font-medium">รหัสหมวดหมู่ (Category ID)</span>
+              <input className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm dark:border-slate-700 dark:bg-slate-900" value={formData.categoryId} onChange={e => setFormData({ ...formData, categoryId: e.target.value })} />
+            </label>
+            <label className="block">
+              <span className="text-sm font-medium">รหัสประเภทเอกสาร (Type ID)</span>
+              <input className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm dark:border-slate-700 dark:bg-slate-900" value={formData.documentTypeId} onChange={e => setFormData({ ...formData, documentTypeId: e.target.value })} />
+            </label>
+            <label className="block md:col-span-2">
+              <span className="text-sm font-medium">Layout JSON</span>
+              <textarea className="mt-1 h-32 w-full rounded-md border border-slate-200 px-3 py-2 text-sm font-mono dark:border-slate-700 dark:bg-slate-900" value={formData.layoutJson} onChange={e => setFormData({ ...formData, layoutJson: e.target.value })} />
+            </label>
+          </div>
+          <div className="flex justify-end gap-3 mt-6">
+            <button type="button" onClick={() => setIsEditing(false)} className="px-4 py-2 text-sm font-medium border border-slate-300 rounded-md hover:bg-slate-50 text-slate-700 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800" disabled={isSaving}>ยกเลิก</button>
+            <button type="submit" className="px-4 py-2 text-sm font-medium bg-teal-600 text-white rounded-md hover:bg-teal-700 disabled:opacity-50" disabled={isSaving}>{isSaving ? "กำลังบันทึก..." : "บันทึกข้อมูล"}</button>
+          </div>
+        </form>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <ConfirmDialog
+        open={deleteId !== null}
+        title="ยืนยันการลบ Template"
+        description="คุณแน่ใจหรือไม่ว่าต้องการลบ Template นี้? การกระทำนี้ไม่สามารถย้อนกลับได้"
+        onCancel={() => setDeleteId(null)}
+        onConfirm={confirmDelete}
+        confirmText="ยืนยันลบ"
+      />
+      <div className="flex flex-wrap gap-2 mb-4">
+        <ActionButton action={{ label: "เพิ่ม Template", onClick: handleAdd }} />
+      </div>
+      
+      {isLoading ? (
+        <div className="py-10 text-center text-slate-500">กำลังโหลดข้อมูล...</div>
+      ) : data.length === 0 ? (
+        <div className="py-10 text-center text-slate-500">ไม่มีข้อมูล Template</div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-3">
+          {data.map((t) => (
+            <div key={t.id} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+              <LayoutIcon />
+              <h2 className="mt-3 font-semibold text-slate-900 dark:text-white">{t.name}</h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                {t.source || "Company"} · {t.category || t.categoryId || "-"} · {t.type || t.documentTypeId || "-"}
+              </p>
+              <div className="mt-3">
+                <Status value={t.status || "Active"} />
+              </div>
+              <div className="mt-4 flex flex-wrap gap-1.5">
+                <ActionButton action={{ label: "แก้ไข", onClick: () => handleEdit(t) }} />
+                <ActionButton action={{ label: "ลบ", destructive: true, onClick: () => handleDelete(t) }} />
+                <ActionButton action={{ label: "Duplicate", onClick: () => handleDuplicate(t) }} />
+                <ActionButton action={{ label: "Active/Inactive", onClick: () => handleToggleStatus(t) }} />
+                <ActionButton action={{ label: "Preview", onClick: () => window.open(`/th/templates/${t.id}/preview`, '_blank') }} />
+                <ActionButton action={{ label: "Designer", onClick: () => window.location.href = `/th/templates/${t.id}/designer` }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function LayoutIcon() { return <FileText className="size-5 text-teal-700" />; }
