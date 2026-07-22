@@ -53,6 +53,34 @@ export const authConfig = {
           };
         }
 
+        // Check if database user matches
+        if (credentials?.email && credentials?.password) {
+          const { prisma } = await import("@/lib/prisma");
+          const bcrypt = await import("bcryptjs");
+          const dbUser = await prisma.companyUser.findFirst({
+            where: { 
+              email: (credentials.email as string).toLowerCase(),
+              status: "ACTIVE"
+            }
+          });
+
+          if (dbUser && dbUser.passwordHash) {
+            const passwordMatch = await bcrypt.compare(
+              credentials.password as string,
+              dbUser.passwordHash
+            );
+            if (passwordMatch) {
+              return {
+                id: dbUser.id,
+                name: dbUser.name,
+                email: dbUser.email,
+                role: dbUser.role,
+                companyId: dbUser.companyId
+              };
+            }
+          }
+        }
+
         return null;
       }
     })
