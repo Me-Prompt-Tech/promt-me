@@ -566,7 +566,182 @@ function Fields() {
 }
 
 function BusinessPartners() {
-  return <DataTable headers={["ชื่อ", "ประเภท", "Tax ID", "สาขา", "อีเมล", "เบอร์โทร", "ที่อยู่", "ผู้ติดต่อ", "เอกสาร"]} rows={partners.map((p) => [p.name, p.type, p.taxId, p.branch, p.email, p.phone, p.address, `${p.contact} ${p.contactPhone}`, p.docs])} actions={["เพิ่มลูกค้า", "แก้ไขลูกค้า", "ลบลูกค้า", "ดูเอกสารที่เกี่ยวข้อง"]} />;
+  const [data, setData] = useState(partners);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingItem, setEditingItem] = useState<any>(null);
+  const [deleteId, setDeleteId] = useState<number | null>(null);
+
+  const initialForm = {
+    name: "",
+    type: "CUSTOMER",
+    taxId: "",
+    branch: "",
+    email: "",
+    phone: "",
+    address: "",
+    contact: "",
+    contactPhone: ""
+  };
+  const [formData, setFormData] = useState(initialForm);
+
+  const handleAdd = () => {
+    setFormData(initialForm);
+    setEditingItem(null);
+    setIsEditing(true);
+  };
+
+  const handleEdit = (idx: number) => {
+    setFormData(data[idx]);
+    setEditingItem(idx);
+    setIsEditing(true);
+  };
+
+  const handleDelete = (idx: number) => {
+    setDeleteId(idx);
+  };
+
+  const confirmDelete = () => {
+    if (deleteId !== null) {
+      const newData = [...data];
+      newData.splice(deleteId, 1);
+      setData(newData);
+      setDeleteId(null);
+    }
+  };
+
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingItem !== null) {
+      const newData = [...data];
+      newData[editingItem] = { ...formData, docs: data[editingItem].docs || 0 };
+      setData(newData);
+    } else {
+      setData([{ ...formData, docs: 0 }, ...data]);
+    }
+    setIsEditing(false);
+  };
+
+  if (isEditing) {
+    return (
+      <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+        <h2 className="text-xl font-semibold mb-4">{editingItem !== null ? "แก้ไขข้อมูลลูกค้า / คู่ค้า" : "เพิ่มลูกค้า / คู่ค้าใหม่"}</h2>
+        <form onSubmit={handleSave} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <label className="block">
+              <span className="text-sm font-medium">ชื่อบริษัท/ร้านค้า</span>
+              <input required className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm dark:border-slate-700 dark:bg-slate-900" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} />
+            </label>
+            <label className="block">
+              <span className="text-sm font-medium">ประเภท</span>
+              <select className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm dark:border-slate-700 dark:bg-slate-900" value={formData.type} onChange={e => setFormData({ ...formData, type: e.target.value })}>
+                <option value="CUSTOMER">CUSTOMER</option>
+                <option value="VENDOR">VENDOR</option>
+              </select>
+            </label>
+            <label className="block">
+              <span className="text-sm font-medium">เลขประจำตัวผู้เสียภาษี (Tax ID)</span>
+              <input className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm dark:border-slate-700 dark:bg-slate-900" value={formData.taxId} onChange={e => setFormData({ ...formData, taxId: e.target.value })} />
+            </label>
+            <label className="block">
+              <span className="text-sm font-medium">รหัสสาขา</span>
+              <input className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm dark:border-slate-700 dark:bg-slate-900" value={formData.branch} onChange={e => setFormData({ ...formData, branch: e.target.value })} />
+            </label>
+            <label className="block">
+              <span className="text-sm font-medium">อีเมล</span>
+              <input type="email" className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm dark:border-slate-700 dark:bg-slate-900" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} />
+            </label>
+            <label className="block">
+              <span className="text-sm font-medium">เบอร์โทรศัพท์</span>
+              <input className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm dark:border-slate-700 dark:bg-slate-900" value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} />
+            </label>
+            <label className="block md:col-span-2">
+              <span className="text-sm font-medium">ที่อยู่</span>
+              <textarea className="mt-1 h-20 w-full rounded-md border border-slate-200 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900" value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} />
+            </label>
+            <label className="block">
+              <span className="text-sm font-medium">ผู้ติดต่อ</span>
+              <input className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm dark:border-slate-700 dark:bg-slate-900" value={formData.contact} onChange={e => setFormData({ ...formData, contact: e.target.value })} />
+            </label>
+            <label className="block">
+              <span className="text-sm font-medium">เบอร์โทรผู้ติดต่อ</span>
+              <input className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm dark:border-slate-700 dark:bg-slate-900" value={formData.contactPhone} onChange={e => setFormData({ ...formData, contactPhone: e.target.value })} />
+            </label>
+          </div>
+          <div className="flex justify-end gap-3 mt-6">
+            <button type="button" onClick={() => setIsEditing(false)} className="px-4 py-2 text-sm font-medium border border-slate-300 rounded-md hover:bg-slate-50 text-slate-700 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">ยกเลิก</button>
+            <button type="submit" className="px-4 py-2 text-sm font-medium bg-teal-600 text-white rounded-md hover:bg-teal-700">บันทึกข้อมูล</button>
+          </div>
+        </form>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <ConfirmDialog
+        open={deleteId !== null}
+        title="ยืนยันการลบข้อมูล"
+        description="คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูลนี้? การกระทำนี้ไม่สามารถย้อนกลับได้"
+        onCancel={() => setDeleteId(null)}
+        onConfirm={confirmDelete}
+        confirmText="ยืนยันลบ"
+      />
+      <div className="flex flex-wrap gap-2">
+        <ActionButton action={{ label: "เพิ่มลูกค้า / คู่ค้า", onClick: handleAdd }} />
+      </div>
+      <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950">
+        <table className="w-full min-w-[1000px] text-left text-sm">
+          <thead className="text-xs uppercase text-slate-500 border-b border-slate-200 dark:border-slate-800">
+            <tr>
+              <th className="py-3 pr-4 font-semibold">ชื่อบริษัท/ร้านค้า</th>
+              <th className="py-3 pr-4 font-semibold">ประเภท</th>
+              <th className="py-3 pr-4 font-semibold">Tax ID / สาขา</th>
+              <th className="py-3 pr-4 font-semibold">ติดต่อ</th>
+              <th className="py-3 pr-4 font-semibold">ผู้ติดต่อ</th>
+              <th className="py-3 pr-4 font-semibold">เอกสาร</th>
+              <th className="py-3 font-semibold text-right">จัดการ</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            {data.length === 0 ? (
+              <tr><td colSpan={7} className="py-8 text-center text-slate-500">ไม่มีข้อมูลลูกค้า / คู่ค้า</td></tr>
+            ) : (
+              data.map((p, idx) => (
+                <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-900/50">
+                  <td className="py-4 pr-4">
+                    <div className="font-medium text-slate-900 dark:text-slate-100">{p.name}</div>
+                    <div className="text-xs text-slate-500 mt-0.5 line-clamp-1">{p.address}</div>
+                  </td>
+                  <td className="py-4 pr-4">
+                    <Status value={p.type} />
+                  </td>
+                  <td className="py-4 pr-4">
+                    <div className="text-slate-700 dark:text-slate-300">{p.taxId || "-"}</div>
+                    <div className="text-xs text-slate-500 mt-0.5">สาขา: {p.branch || "-"}</div>
+                  </td>
+                  <td className="py-4 pr-4">
+                    <div className="text-slate-700 dark:text-slate-300">{p.email || "-"}</div>
+                    <div className="text-xs text-slate-500 mt-0.5">{p.phone || "-"}</div>
+                  </td>
+                  <td className="py-4 pr-4">
+                    <div className="text-slate-700 dark:text-slate-300">{p.contact || "-"}</div>
+                    <div className="text-xs text-slate-500 mt-0.5">{p.contactPhone || "-"}</div>
+                  </td>
+                  <td className="py-4 pr-4 text-slate-700 dark:text-slate-300">{p.docs || 0}</td>
+                  <td className="py-4 text-right">
+                    <div className="flex justify-end gap-1.5">
+                      <ActionButton action={{ label: "แก้ไข", onClick: () => handleEdit(idx) }} />
+                      <ActionButton action={{ label: "ลบ", destructive: true, onClick: () => handleDelete(idx) }} />
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
 }
 
 function Employees() {
