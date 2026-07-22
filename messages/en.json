@@ -11,6 +11,20 @@
     "login": "Login",
     "email": "Email",
     "password": "Password",
-    "invalid_credentials": "Invalid email or password"
+    "invalid_credentials": "Invalid email or password",
+    "register": "Register",
+    "no_account": "Don't have an account?",
+    "have_account": "Already have an account?",
+    "name": "Name-Surname",
+    "phone": "Phone Number",
+    "role": "Role",
+    "businessName": "Business Name",
+    "businessPhone": "Business Phone",
+    "businessType": "Business Type",
+    "owner": "Owner",
+    "accountant": "Accountant",
+    "staff": "Staff",
+    "accountingFirm": "Accounting Firm / Accountant",
+    "register_success": "Registration successful! Logging in..."
   }
 }

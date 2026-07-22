@@ -6,6 +6,9 @@ import {
   ApiError,
   apiErrorPayload,
   approvalActionSchema,
+  approvalFlowSchema,
+  companyUserSchema,
+  documentNumberSettingSchema,
   assertCanDelete,
   assertCompanyActive,
   assertFound,
@@ -18,6 +21,7 @@ import {
 } from "@/lib/validation";
 import { NextRequest, NextResponse } from "next/server";
 import type { Session } from "next-auth";
+import bcrypt from "bcryptjs";
 
 type RouteContext = {
   params: Promise<{
@@ -71,7 +75,7 @@ function handleApiError(errorValue: unknown) {
       ok: false,
       code: "VALIDATION_ERROR",
       message: "มีข้อมูลนี้อยู่ในระบบแล้ว (ข้อมูลซ้ำซ้อน)",
-      error: (errorValue as any).message || "ข้อมูลซ้ำซ้อน",
+      error: (errorValue as Error).message,
     }, 400);
   }
 
@@ -112,38 +116,30 @@ function isCompanyRoleAllowed(
   if (role === "STAFF") {
     return (
       isReadRequest(request) ||
-      (resource === "documents" && request.method === "POST")
+      (resource === "documents" && request.method === "POST") ||
+      (resource === "approvals" && request.method === "POST") ||
+      (resource === "companies" && request.method === "PUT") ||
+      ["company-users", "document-number-settings"].includes(resource)
     );
   }
 
-  if (role === "ACCOUNTANT") {
+  if (role === "ACCOUNTANT" || role === "FINANCE") {
     return (
-      ["dashboard", "documents", "document-number-settings", "reports"].includes(resource) &&
+      ["dashboard", "documents", "document-number-settings", "reports", "approvals", "approval-flows", "companies", "company-users"].includes(resource) &&
       !["cancel", "archive"].includes(action ?? "")
     );
   }
 
   if (role === "HR") {
-    return ["dashboard", "documents", "employees", "departments", "approvals"].includes(resource);
+    return ["dashboard", "documents", "employees", "departments", "approvals", "approval-flows", "companies", "company-users", "document-number-settings"].includes(resource);
   }
 
   if (role === "OPERATION") {
-    return ["dashboard", "documents", "approvals", "reports"].includes(resource);
+    return ["dashboard", "documents", "approvals", "reports", "approval-flows", "companies", "company-users", "document-number-settings"].includes(resource);
   }
 
   if (role === "ADMIN") {
-    return [
-      "dashboard",
-      "documents",
-      "templates",
-      "business-partners",
-      "employees",
-      "departments",
-      "approval-flows",
-      "approvals",
-      "document-number-settings",
-      "reports",
-    ].includes(resource);
+    return true;
   }
 
   return false;
@@ -200,28 +196,20 @@ const modelMap: Record<string, any> = {
 function getPrismaModel(resource: string): any {
   const modelName = modelMap[resource];
   if (!modelName) throw new ApiError("ROUTE_NOT_FOUND", `No model for resource ${resource}`, 404);
-  return (prisma as any)[modelName];
+  // @ts-ignore
+  return prisma[modelName];
 }
 
 export async function dbList(resource: string, whereClause: any = {}) {
   const model = getPrismaModel(resource);
-  const include = resource === "employees"
-    ? { department: true }
-    : resource === "departments"
-      ? { _count: { select: { users: true, employees: true } } }
-      : undefined;
-  const data = await model.findMany({ where: whereClause, include, orderBy: { createdAt: "desc" } });
+  // Use createdAt desc if possible, otherwise it just returns data
+  const data = await model.findMany({ where: whereClause, orderBy: { createdAt: "desc" } });
   return { ok: true, resource, data };
 }
 
 export async function dbDetail(resource: string, whereClause: any = {}) {
   const model = getPrismaModel(resource);
-  const include = resource === "employees"
-    ? { department: true }
-    : resource === "departments"
-      ? { _count: { select: { users: true, employees: true } } }
-      : undefined;
-  const data = await model.findFirst({ where: whereClause, include });
+  const data = await model.findFirst({ where: whereClause });
   if (!data) throw new ApiError("NOT_FOUND", "ไม่พบข้อมูล", 404);
   return { ok: true, resource, data };
 }
@@ -366,195 +354,490 @@ export async function handleCompanyApi(request: NextRequest, context: RouteConte
       return error("Company API route not found", 404, "ROUTE_NOT_FOUND");
     }
 
-  if (!isCompanyRoleAllowed(session.user.role, resource, request, action)) {
-    return error("Forbidden: role is not allowed for this company action", 403, "FORBIDDEN");
-  }
+    if (!isCompanyRoleAllowed(session.user.role, resource, request, action)) {
+      return error("Forbidden: role is not allowed for this company action", 403, "FORBIDDEN");
+    }
 
-  if (resource === "dashboard" && request.method === "GET") {
-    return json({
-      ok: true,
-      tenant: { companyId, where: { companyId } },
-      data: {
-        totalDocuments: 1248,
-        draftDocuments: 82,
-        pendingDocuments: 36,
-        approvedDocuments: 904,
-        totalCustomers: 186,
-        totalEmployees: 64,
-      },
-    });
-  }
-
-  if (resource === "reports") {
-    const reportName = id;
-    if (request.method === "GET" && ["documents", "export-excel", "export-pdf"].includes(reportName ?? "")) {
-      if (reportName === "export-pdf") {
-        const pdf = createPdfExport({
-          companyId,
-          actorUserId: session.user.id,
-          source: "PREVIEW",
-          fileName: `document-report-${companyId}.pdf`,
-          dataJson: {
-            company: { name: "Prompt Me Co., Ltd.", taxId: "0105566000001", address: "Bangkok" },
-            document: { documentNo: "REPORT-2026-07", date: "08/07/2026", total: "184,000 documents" },
-          },
-        });
-
-        return json({
-          ...pdf,
-          report: reportName,
-          tenant: { companyId, where: { companyId } },
-          auditLog: {
-            ...pdf.auditLog,
-            detail: { ...pdf.auditLog.detail, report: "documents" },
-            ipAddress: requestIp(request),
-            userAgent: request.headers.get("user-agent") ?? "unknown",
-          },
-        });
-      }
-
+    if (resource === "dashboard" && request.method === "GET") {
       return json({
         ok: true,
-        report: reportName,
         tenant: { companyId, where: { companyId } },
-        data: [],
+        data: {
+          totalDocuments: 1248,
+          draftDocuments: 82,
+          pendingDocuments: 36,
+          approvedDocuments: 904,
+          totalCustomers: 186,
+          totalEmployees: 64,
+        },
       });
     }
-    return error("Report route not found", 404, "ROUTE_NOT_FOUND");
-  }
 
-  if (resource === "approvals" && id && ["approve", "reject"].includes(action ?? "") && request.method === "POST") {
-    const actionData = validate(approvalActionSchema, await readBody(request));
-    return json(await dbUpdate(resource, { id, companyId }, actionData));
-  }
+    if (resource === "reports") {
+      const reportName = id;
+      if (request.method === "GET" && ["documents", "export-excel", "export-pdf"].includes(reportName ?? "")) {
+        if (reportName === "export-pdf") {
+          const pdf = createPdfExport({
+            companyId,
+            actorUserId: session.user.id,
+            source: "PREVIEW",
+            fileName: `document-report-${companyId}.pdf`,
+            dataJson: {
+              company: { name: "Prompt Me Co., Ltd.", taxId: "0105566000001", address: "Bangkok" },
+              document: { documentNo: "REPORT-2026-07", date: "08/07/2026", total: "184,000 documents" },
+            },
+          });
 
-  if (resource === "templates" && id && action === "designer" && request.method === "PUT") {
-    return json(await dbUpdate(resource, { id, companyId }, await readBody(request)));
-  }
-
-  if (resource === "templates" && id && ["export-pdf", "export-preview-pdf"].includes(action ?? "") && request.method === "POST") {
-    assertFound(id);
-    const body = validate(pdfExportSchema, await readBody(request));
-    if (body.fileName === "fail.pdf") {
-      throw new ApiError("PDF_EXPORT_FAILED", "Export PDF ไม่สำเร็จ", 500, [{ field: "fileName", message: "PDF renderer failed" }]);
-    }
-    const pdf = createPdfExport({
-      ...pdfBody(body),
-      companyId,
-      templateId: id,
-      actorUserId: session.user.id,
-      source: "PREVIEW",
-      fileName: `template-preview-${id}.pdf`,
-    });
-
-    return json({
-      ...pdf,
-      tenant: { companyId, where: { companyId, templateId: id } },
-      auditLog: {
-        ...pdf.auditLog,
-        ipAddress: requestIp(request),
-        userAgent: request.headers.get("user-agent") ?? "unknown",
-      },
-    });
-  }
-
-  if (resource === "templates" && id && action === "fields") {
-    if (request.method === "GET") {
-      return json(await dbList("template-fields", { templateId: id, companyId }));
-    }
-    if (request.method === "POST") {
-      const body = validate(templateFieldSchema, await readBody(request));
-      return json(await dbCreate("template-fields", { ...(body as object), templateId: id, companyId }), 201);
-    }
-    if (nestedId && request.method === "PUT") {
-      const body = validate(templateFieldSchema, await readBody(request));
-      return json(await dbUpdate("template-fields", { id: nestedId, templateId: id, companyId }, body));
-    }
-    if (nestedId && request.method === "DELETE") {
-      assertCanDelete("template-fields", nestedId);
-      return json(await dbDelete("template-fields", { id: nestedId, templateId: id, companyId }));
-    }
-  }
-
-  if (id && action && request.method === "POST") {
-    const allowedActions = new Set([
-      "duplicate",
-      "submit-approval",
-      "export-pdf",
-      "cancel",
-      "archive",
-    ]);
-
-    if (allowedActions.has(action)) {
-      if (resource === "documents" && action === "export-pdf") {
-        assertFound(id);
-        const body = validate(pdfExportSchema, await readBody(request));
-        if (body.fileName === "fail.pdf") {
-          throw new ApiError("PDF_EXPORT_FAILED", "Export PDF ไม่สำเร็จ", 500, [{ field: "fileName", message: "PDF renderer failed" }]);
+          return json({
+            ...pdf,
+            report: reportName,
+            tenant: { companyId, where: { companyId } },
+            auditLog: {
+              ...pdf.auditLog,
+              detail: { ...pdf.auditLog.detail, report: "documents" },
+              ipAddress: requestIp(request),
+              userAgent: request.headers.get("user-agent") ?? "unknown",
+            },
+          });
         }
-        const pdf = createPdfExport({
-          ...pdfBody(body),
-          companyId,
-          documentId: id,
-          actorUserId: session.user.id,
-          source: "DOCUMENT",
-          fileName: `document-${id}.pdf`,
-        });
 
         return json({
-          ...pdf,
-          tenant: { companyId, where: { companyId, id } },
-          auditLog: {
-            ...pdf.auditLog,
-            ipAddress: requestIp(request),
-            userAgent: request.headers.get("user-agent") ?? "unknown",
-          },
+          ok: true,
+          report: reportName,
+          tenant: { companyId, where: { companyId } },
+          data: [],
         });
       }
+      return error("Report route not found", 404, "ROUTE_NOT_FOUND");
+    }
 
+    if (resource === "approvals" && id && ["approve", "reject"].includes(action ?? "") && request.method === "POST") {
+      const actionData = validate(approvalActionSchema, await readBody(request));
+      const isApprove = action === "approve";
+      const status = isApprove ? "APPROVED" : "REJECTED";
+      const userId = session.user.id;
+
+      // Load the approval record
+      const approval = await prisma.documentApproval.findFirst({
+        where: { id, companyId },
+        include: { document: true }
+      });
+
+      if (!approval) {
+        throw new ApiError("NOT_FOUND", "ไม่พบงานอนุมัติ", 404);
+      }
+
+      const docId = approval.documentId;
+
+      // Update the approval record
+      const updatedApproval = await prisma.documentApproval.update({
+        where: { id },
+        data: {
+          status,
+          note: actionData.note || null,
+          actionById: userId,
+          actionAt: new Date()
+        }
+      });
+
+      if (!isApprove) {
+        // Rejecting the document: Reject the whole document
+        await prisma.document.update({
+          where: { id: docId },
+          data: {
+            status: "REJECTED",
+            rejectedReason: actionData.note || null,
+            rejectedAt: new Date()
+          }
+        });
+      } else {
+        // Approving the document: Check if there are other steps
+        const allSteps = await prisma.documentApproval.findMany({
+          where: { documentId: docId },
+          orderBy: { stepOrder: "asc" }
+        });
+
+        // Find the next pending step
+        const nextStep = allSteps.find(step => step.stepOrder > approval.stepOrder);
+
+        if (nextStep) {
+          // There is a next step: set it to PENDING (if it isn't already) and update current step order
+          await prisma.document.update({
+            where: { id: docId },
+            data: {
+              currentApprovalStep: nextStep.stepOrder
+            }
+          });
+        } else {
+          // No more steps: Document is fully approved!
+          await prisma.document.update({
+            where: { id: docId },
+            data: {
+              status: "APPROVED",
+              approvedById: userId,
+              approvedAt: new Date()
+            }
+          });
+        }
+      }
+
+      return json({ ok: true, data: updatedApproval });
+    }
+
+    if (resource === "templates" && id && action === "designer" && request.method === "PUT") {
       return json(await dbUpdate(resource, { id, companyId }, await readBody(request)));
     }
-  }
 
-  if (id && action && !companySubresources.has(action)) {
-    return error("Action route not found", 404, "ROUTE_NOT_FOUND");
-  }
+    if (resource === "templates" && id && ["export-pdf", "export-preview-pdf"].includes(action ?? "") && request.method === "POST") {
+      assertFound(id);
+      const body = validate(pdfExportSchema, await readBody(request));
+      if (body.fileName === "fail.pdf") {
+        throw new ApiError("PDF_EXPORT_FAILED", "Export PDF ไม่สำเร็จ", 500, [{ field: "fileName", message: "PDF renderer failed" }]);
+      }
+      const pdf = createPdfExport({
+        ...pdfBody(body),
+        companyId,
+        templateId: id,
+        actorUserId: session.user.id,
+        source: "PREVIEW",
+        fileName: `template-preview-${id}.pdf`,
+      });
 
-  const getCompanyWhere = (resourceName: string, targetId?: string) => {
-    let where: any = {};
-    if (targetId) where.id = targetId;
-    if (["document-categories", "document-types", "templates"].includes(resourceName)) {
-      where.OR = [{ companyId }, { isGlobal: true }];
-    } else {
-      where.companyId = companyId;
+      return json({
+        ...pdf,
+        tenant: { companyId, where: { companyId, templateId: id } },
+        auditLog: {
+          ...pdf.auditLog,
+          ipAddress: requestIp(request),
+          userAgent: request.headers.get("user-agent") ?? "unknown",
+        },
+      });
     }
-    return where;
-  };
 
-  if (!id && request.method === "GET") {
-    return json(await dbList(resource, getCompanyWhere(resource)));
-  }
+    if (resource === "templates" && id && action === "fields") {
+      if (request.method === "GET") {
+        return json(await dbList("template-fields", { templateId: id, companyId }));
+      }
+      if (request.method === "POST") {
+        const body = validate(templateFieldSchema, await readBody(request));
+        return json(await dbCreate("template-fields", { ...(body as object), templateId: id, companyId }), 201);
+      }
+      if (nestedId && request.method === "PUT") {
+        const body = validate(templateFieldSchema, await readBody(request));
+        return json(await dbUpdate("template-fields", { id: nestedId, templateId: id, companyId }, body));
+      }
+      if (nestedId && request.method === "DELETE") {
+        assertCanDelete("template-fields", nestedId);
+        return json(await dbDelete("template-fields", { id: nestedId, templateId: id, companyId }));
+      }
+    }
 
-  if (!id && request.method === "POST") {
-    const body = await validatedBody(request, resource);
-    return json(await dbCreate(resource, { ...(body as object), companyId }), 201);
-  }
+    if (id && action && request.method === "POST") {
+      const allowedActions = new Set([
+        "duplicate",
+        "submit-approval",
+        "export-pdf",
+        "cancel",
+        "archive",
+      ]);
 
-  if (id && !action && request.method === "GET") {
-    return json(await dbDetail(resource, getCompanyWhere(resource, id)));
-  }
+      if (allowedActions.has(action)) {
+        if (resource === "documents" && action === "export-pdf") {
+          assertFound(id);
+          const body = validate(pdfExportSchema, await readBody(request));
+          if (body.fileName === "fail.pdf") {
+            throw new ApiError("PDF_EXPORT_FAILED", "Export PDF ไม่สำเร็จ", 500, [{ field: "fileName", message: "PDF renderer failed" }]);
+          }
+          const pdf = createPdfExport({
+            ...pdfBody(body),
+            companyId,
+            documentId: id,
+            actorUserId: session.user.id,
+            source: "DOCUMENT",
+            fileName: `document-${id}.pdf`,
+          });
 
-  if (id && !action && request.method === "PUT") {
-    const body = await validatedBody(request, resource);
-    return json(await dbUpdate(resource, { id, companyId }, body));
-  }
+          return json({
+            ...pdf,
+            tenant: { companyId, where: { companyId, id } },
+            auditLog: {
+              ...pdf.auditLog,
+              ipAddress: requestIp(request),
+              userAgent: request.headers.get("user-agent") ?? "unknown",
+            },
+          });
+        }
 
-  if (id && !action && request.method === "DELETE") {
-    assertCanDelete(resource, id);
-    return json(await dbDelete(resource, { id, companyId }));
-  }
+        if (resource === "documents" && action === "submit-approval") {
+          const doc = await prisma.document.findFirst({
+            where: { id, companyId }
+          });
 
-  return error("Method or route not allowed", 405, "METHOD_NOT_ALLOWED");
+          if (!doc) throw new ApiError("NOT_FOUND", "ไม่พบเอกสาร", 404);
+
+          // Find approval flow for this document type
+          let flow = await prisma.approvalFlow.findFirst({
+            where: { documentTypeId: doc.documentTypeId, companyId, isActive: true },
+            include: { steps: { orderBy: { stepOrder: "asc" } } }
+          });
+
+          // Check if there are any approval flows at all for this company.
+          const totalFlows = await prisma.approvalFlow.count({
+            where: { companyId }
+          });
+
+          if (totalFlows === 0 || !flow) {
+            // Dynamically create a default approval flow for this company and document type!
+            flow = await prisma.approvalFlow.create({
+              data: {
+                companyId,
+                documentTypeId: doc.documentTypeId,
+                name: `ขั้นตอนอนุมัติเริ่มต้น`,
+                isActive: true,
+                steps: {
+                  create: [
+                    { companyId, stepOrder: 1, approverRole: "OWNER" },
+                    { companyId, stepOrder: 2, approverRole: "ACCOUNTANT" }
+                  ]
+                }
+              },
+              include: { steps: { orderBy: { stepOrder: "asc" } } }
+            });
+          }
+
+          if (flow && flow.steps.length > 0) {
+            // Delete any existing approvals for this document first to avoid duplication
+            await prisma.documentApproval.deleteMany({
+              where: { documentId: id }
+            });
+
+            // Create document approvals for each step
+            const approvalsData = flow.steps.map((step) => ({
+              companyId,
+              documentId: id,
+              stepOrder: step.stepOrder,
+              status: "PENDING" as const,
+              note: null
+            }));
+
+            await prisma.documentApproval.createMany({
+              data: approvalsData
+            });
+
+            // Update document status to PENDING and current step to the first step order
+            const updatedDoc = await prisma.document.update({
+              where: { id },
+              data: {
+                status: "PENDING",
+                currentApprovalStep: flow.steps[0].stepOrder,
+                rejectedReason: null,
+                rejectedAt: null,
+                approvedById: null,
+                approvedAt: null
+              }
+            });
+
+            return json({ ok: true, data: updatedDoc });
+          } else {
+            // Fallback auto-approve
+            const updatedDoc = await prisma.document.update({
+              where: { id },
+              data: {
+                status: "APPROVED",
+                approvedById: session.user.id,
+                approvedAt: new Date()
+              }
+            });
+            return json({ ok: true, message: "อนุมัติเอกสารอัตโนมัติเนื่องจากไม่มีขั้นตอนการอนุมัติ", data: updatedDoc });
+          }
+        }
+
+        return json(await dbUpdate(resource, { id, companyId }, await readBody(request)));
+      }
+    }
+
+    if (id && action && !companySubresources.has(action)) {
+      return error("Action route not found", 404, "ROUTE_NOT_FOUND");
+    }
+
+    const getCompanyWhere = (resourceName: string, targetId?: string) => {
+      let where: any = {};
+      if (targetId) where.id = targetId;
+      if (["document-categories", "document-types", "templates"].includes(resourceName)) {
+        where.OR = [{ companyId }, { isGlobal: true }];
+      } else {
+        where.companyId = companyId;
+      }
+      return where;
+    };
+
+    if (resource === "approval-flows" && !id && request.method === "POST") {
+      const body = validate(approvalFlowSchema, await readBody(request));
+
+      const newFlow = await prisma.$transaction(async (tx) => {
+        const flow = await tx.approvalFlow.create({
+          data: {
+            companyId,
+            documentTypeId: body.documentTypeId,
+            name: body.name,
+            isActive: body.isActive,
+          }
+        });
+
+        const stepsData = (body.steps || []).map(step => ({
+          companyId,
+          approvalFlowId: flow.id,
+          stepOrder: step.stepOrder,
+          approverRole: step.approverRole || null,
+          approverUserId: step.approverUserId || null
+        }));
+
+        if (stepsData.length > 0) {
+          await tx.approvalStep.createMany({
+            data: stepsData
+          });
+        }
+
+        return tx.approvalFlow.findUnique({
+          where: { id: flow.id },
+          include: { steps: { orderBy: { stepOrder: "asc" } }, documentType: true }
+        });
+      });
+
+      return json({ ok: true, action: "create", resource, data: newFlow }, 201);
+    }
+
+    if (resource === "approval-flows" && id && !action && request.method === "PUT") {
+      const body = validate(approvalFlowSchema, await readBody(request));
+
+      const updatedFlow = await prisma.$transaction(async (tx) => {
+        const flow = await tx.approvalFlow.findFirst({
+          where: { id, companyId }
+        });
+        if (!flow) throw new ApiError("NOT_FOUND", "ไม่พบ Flow", 404);
+
+        await tx.approvalFlow.update({
+          where: { id },
+          data: {
+            name: body.name,
+            documentTypeId: body.documentTypeId,
+            isActive: body.isActive
+          }
+        });
+
+        await tx.approvalStep.deleteMany({
+          where: { approvalFlowId: id }
+        });
+
+        const stepsData = (body.steps || []).map(step => ({
+          companyId,
+          approvalFlowId: id,
+          stepOrder: step.stepOrder,
+          approverRole: step.approverRole || null,
+          approverUserId: step.approverUserId || null
+        }));
+
+        if (stepsData.length > 0) {
+          await tx.approvalStep.createMany({
+            data: stepsData
+          });
+        }
+
+        return tx.approvalFlow.findUnique({
+          where: { id },
+          include: { steps: { orderBy: { stepOrder: "asc" } }, documentType: true }
+        });
+      });
+
+      return json({ ok: true, action: "update", resource, data: updatedFlow });
+    }
+
+    if (resource === "approval-flows" && id && !action && request.method === "DELETE") {
+      const flow = await prisma.approvalFlow.findFirst({
+        where: { id, companyId }
+      });
+      if (!flow) throw new ApiError("NOT_FOUND", "ไม่พบ Flow", 404);
+
+      await prisma.$transaction(async (tx) => {
+        await tx.approvalStep.deleteMany({
+          where: { approvalFlowId: id }
+        });
+        await tx.approvalFlow.delete({
+          where: { id }
+        });
+      });
+
+      return json({ ok: true, action: "delete", resource, id });
+    }
+
+    if (resource === "company-users" && !id && request.method === "POST") {
+      const body = validate(companyUserSchema, await readBody(request));
+      const defaultPassword = "password123";
+      const passwordHash = await bcrypt.hash(defaultPassword, 10);
+
+      const newUser = await prisma.companyUser.create({
+        data: {
+          companyId,
+          name: body.name,
+          email: body.email.toLowerCase(),
+          role: body.role,
+          status: body.status || "ACTIVE",
+          departmentId: body.departmentId || null,
+          phone: body.phone || null,
+          passwordHash: passwordHash
+        }
+      });
+      return json({ ok: true, action: "create", resource, data: newUser }, 201);
+    }
+
+    if (resource === "company-users" && id && action === "reset-password" && request.method === "POST") {
+      const defaultPassword = "password123";
+      const passwordHash = await bcrypt.hash(defaultPassword, 10);
+      const updatedUser = await prisma.companyUser.update({
+        where: { id },
+        data: { passwordHash }
+      });
+      return json({ ok: true, action: "reset-password", resource, data: updatedUser });
+    }
+
+    if (resource === "company-users" && id && !action && request.method === "DELETE") {
+      if (id === session.user.id) {
+        throw new ApiError("BAD_REQUEST", "ไม่สามารถลบบัญชีตัวเองได้", 400);
+      }
+      const user = await prisma.companyUser.findFirst({
+        where: { id, companyId }
+      });
+      if (!user) throw new ApiError("NOT_FOUND", "ไม่พบผู้ใช้งาน", 404);
+      await prisma.companyUser.delete({
+        where: { id }
+      });
+      return json({ ok: true, action: "delete", resource, id });
+    }
+
+    if (!id && request.method === "GET") {
+      return json(await dbList(resource, getCompanyWhere(resource)));
+    }
+
+    if (!id && request.method === "POST") {
+      const body = await validatedBody(request, resource);
+      return json(await dbCreate(resource, { ...(body as object), companyId }), 201);
+    }
+
+    if (id && !action && request.method === "GET") {
+      return json(await dbDetail(resource, getCompanyWhere(resource, id)));
+    }
+
+    if (id && !action && request.method === "PUT") {
+      const body = await validatedBody(request, resource);
+      return json(await dbUpdate(resource, { id, companyId }, body));
+    }
+
+    if (id && !action && request.method === "DELETE") {
+      assertCanDelete(resource, id);
+      return json(await dbDelete(resource, { id, companyId }));
+    }
+
+    return error("Method or route not allowed", 405, "METHOD_NOT_ALLOWED");
   } catch (errorValue) {
     return handleApiError(errorValue);
   }

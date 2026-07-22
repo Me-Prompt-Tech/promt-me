@@ -16,7 +16,7 @@ const companyRoles = new Set([
   "VIEWER",
 ]);
 
-const publicPaths = new Set(["", "/", "/login"]);
+const publicPaths = new Set(["", "/", "/login", "/register"]);
 
 type UserLike = {
   role?: string;
@@ -73,6 +73,7 @@ function canAccessCompanyPath(user: UserLike | undefined, path: string) {
       "/approval-flows",
       "/document-number-settings",
       "/settings/users",
+      "/settings/company",
     ].some((blockedPath) => path.startsWith(blockedPath));
   }
 
@@ -83,6 +84,11 @@ function canAccessCompanyPath(user: UserLike | undefined, path: string) {
       "/documents/create",
       "/templates",
       "/business-partners",
+      "/approvals",
+      "/approval-flows",
+      "/document-number-settings",
+      "/settings/company",
+      "/settings/users",
     ].some((allowedPath) => path.startsWith(allowedPath));
   }
 
@@ -92,8 +98,11 @@ function canAccessCompanyPath(user: UserLike | undefined, path: string) {
       "/documents",
       "/documents/create",
       "/approvals",
+      "/approval-flows",
       "/document-number-settings",
       "/reports",
+      "/settings/company",
+      "/settings/users",
     ].some((allowedPath) => path.startsWith(allowedPath));
   }
 
@@ -105,6 +114,10 @@ function canAccessCompanyPath(user: UserLike | undefined, path: string) {
       "/employees",
       "/departments",
       "/approvals",
+      "/approval-flows",
+      "/document-number-settings",
+      "/settings/company",
+      "/settings/users",
     ].some((allowedPath) => path.startsWith(allowedPath));
   }
 
@@ -114,12 +127,16 @@ function canAccessCompanyPath(user: UserLike | undefined, path: string) {
       "/documents",
       "/documents/create",
       "/approvals",
+      "/approval-flows",
       "/reports",
+      "/document-number-settings",
+      "/settings/company",
+      "/settings/users",
     ].some((allowedPath) => path.startsWith(allowedPath));
   }
 
   if (role === "ADMIN") {
-    return !path.startsWith("/settings/users");
+    return true;
   }
 
   return false;
