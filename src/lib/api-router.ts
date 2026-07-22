@@ -75,7 +75,7 @@ function handleApiError(errorValue: unknown) {
       ok: false,
       code: "VALIDATION_ERROR",
       message: "มีข้อมูลนี้อยู่ในระบบแล้ว (ข้อมูลซ้ำซ้อน)",
-      error: (errorValue as Error).message,
+      error: (errorValue as any).message ?? "Unknown error",
     }, 400);
   }
 
@@ -196,32 +196,57 @@ const modelMap: Record<string, any> = {
 function getPrismaModel(resource: string): any {
   const modelName = modelMap[resource];
   if (!modelName) throw new ApiError("ROUTE_NOT_FOUND", `No model for resource ${resource}`, 404);
-  // @ts-ignore
-  return prisma[modelName];
+  return (prisma as any)[modelName];
 }
 
 export async function dbList(resource: string, whereClause: any = {}) {
   const model = getPrismaModel(resource);
-  // Use createdAt desc if possible, otherwise it just returns data
-  const data = await model.findMany({ where: whereClause, orderBy: { createdAt: "desc" } });
+  const include =
+    resource === "employees"
+      ? { department: true }
+      : resource === "departments"
+        ? { _count: { select: { users: true, employees: true } } }
+        : undefined;
+  const data = await model.findMany({ where: whereClause, include, orderBy: { createdAt: "desc" } });
   return { ok: true, resource, data };
 }
 
 export async function dbDetail(resource: string, whereClause: any = {}) {
   const model = getPrismaModel(resource);
-  const data = await model.findFirst({ where: whereClause });
+  const include =
+    resource === "employees"
+      ? { department: true }
+      : resource === "departments"
+        ? { _count: { select: { users: true, employees: true } } }
+        : undefined;
+  const data = await model.findFirst({ where: whereClause, include });
   if (!data) throw new ApiError("NOT_FOUND", "ไม่พบข้อมูล", 404);
   return { ok: true, resource, data };
 }
 
 export async function dbCreate(resource: string, dataPayload: any) {
   const model = getPrismaModel(resource);
+<<<<<<< Updated upstream
   const include = resource === "employees"
     ? { department: true }
     : resource === "departments"
       ? { _count: { select: { users: true, employees: true } } }
       : undefined;
   const data = await model.create({ data: dataPayload, include });
+=======
+  let payload = { ...dataPayload };
+  if (resource === "employees") {
+    if (payload.startDate && typeof payload.startDate === "string") payload.startDate = new Date(payload.startDate);
+    if (payload.endDate && typeof payload.endDate === "string") payload.endDate = new Date(payload.endDate);
+  }
+  const include =
+    resource === "employees"
+      ? { department: true }
+      : resource === "departments"
+        ? { _count: { select: { users: true, employees: true } } }
+        : undefined;
+  const data = await model.create({ data: payload, include });
+>>>>>>> Stashed changes
   return { ok: true, action: "create", resource, data };
 }
 
@@ -234,7 +259,22 @@ export async function dbUpdate(resource: string, whereClause: any, dataPayload: 
       : undefined;
   const existing = await model.findFirst({ where: whereClause });
   if (!existing) throw new ApiError("NOT_FOUND", "ไม่พบข้อมูล", 404);
+<<<<<<< Updated upstream
   const data = await model.update({ where: { id: existing.id }, data: dataPayload, include });
+=======
+  let payload = { ...dataPayload };
+  if (resource === "employees") {
+    if (payload.startDate && typeof payload.startDate === "string") payload.startDate = new Date(payload.startDate);
+    if (payload.endDate && typeof payload.endDate === "string") payload.endDate = new Date(payload.endDate);
+  }
+  const include =
+    resource === "employees"
+      ? { department: true }
+      : resource === "departments"
+        ? { _count: { select: { users: true, employees: true } } }
+        : undefined;
+  const data = await model.update({ where: { id: existing.id }, data: payload, include });
+>>>>>>> Stashed changes
   return { ok: true, action: "update", resource, data };
 }
 

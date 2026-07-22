@@ -312,12 +312,6 @@ export function CompanyAffidavitTemplate({
       </div>
 
       <div className="mt-20 w-full flex justify-end pr-16 relative">
-        <div className="w-32 h-32 rounded-full border border-blue-600/30 absolute -top-8 right-32 flex items-center justify-center -rotate-12 bg-blue-50/20">
-          <span className="text-[10px] text-blue-600/50 flex flex-col items-center">
-            <span>สำนักงานทะเบียน</span>
-            <span>นายทะเบียน</span>
-          </span>
-        </div>
         <div className="flex flex-col items-center text-sm z-10 mr-8">
           <span className="mb-2 text-blue-800">(นายอนันต ศรีกสิกรณ์)</span>
           <span className="font-semibold">นายทะเบียน</span>

@@ -25,6 +25,8 @@ import { DocumentDesigner } from "@/components/document-designer";
 import { TaxInvoiceTemplate } from "@/components/templates/tax-invoice";
 import { QuotationTemplate } from "@/components/templates/quotation";
 import { CompanyAffidavitTemplate } from "@/components/templates/company-affidavit";
+import { EmployeeManagement } from "@/components/employee-management";
+import { DepartmentManagement } from "@/components/department-management";
 
 export type CompanySection =
   | "dashboard"
@@ -2848,8 +2850,8 @@ export function CompanyWorkspace({ section, data, companyId }: { section: Compan
         {section === "designer" && <Designer />}
         {section === "fields" && <Fields />}
         {section === "business-partners" && <><Toolbar placeholder="ค้นหาลูกค้า / คู่ค้า" filters={["CUSTOMER / VENDOR"]} actions={[]} /><BusinessPartners /></>}
-        {section === "employees" && <><Toolbar placeholder="ค้นหาพนักงาน" filters={["แผนก", "สถานะ"]} actions={[]} /><Employees /></>}
-        {section === "departments" && <Departments />}
+        {section === "employees" && <EmployeeManagement initialEmployees={data?.employees} departments={data?.departments} companyId={companyId} />}
+        {section === "departments" && <DepartmentManagement initialDepartments={data?.departments} companyId={companyId} />}
         {section === "approval-flows" && <ApprovalFlows />}
         {section === "approvals" && <Approvals />}
         {section === "document-number-settings" && <NumberSettings />}
