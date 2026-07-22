@@ -68,8 +68,31 @@ export function validate<TSchema extends ZodTypeAny>(schema: TSchema, data: unkn
 }
 
 const nonEmptyString = z.string().trim().min(1, "กรุณากรอกข้อมูล");
-const optionalString = z.string().trim().optional();
+
+export const optionalString = z
+  .string()
+  .trim()
+  .nullish()
+  .transform((val) => (val === "" ? undefined : val ?? undefined));
+
+export const optionalEmail = z
+  .string()
+  .trim()
+  .nullish()
+  .transform((val) => (val === "" ? undefined : val ?? undefined))
+  .pipe(z.string().email("อีเมลไม่ถูกต้อง").optional());
+
 const objectIdLike = z.string().trim().min(1, "ไม่พบรหัสข้อมูล");
+
+export const optionalObjectId = z
+  .string()
+  .trim()
+  .nullish()
+  .transform((val) => {
+    if (!val || val === "") return undefined;
+    if (/^[0-9a-fA-F]{24}$/.test(val)) return val;
+    return undefined;
+  });
 
 export const statusUpdateSchema = z.object({
   status: z.string().trim().min(1, "กรุณาระบุสถานะ"),
@@ -94,7 +117,7 @@ export const companyUserSchema = z.object({
   email: z.email("อีเมลไม่ถูกต้อง"),
   role: z.enum(["OWNER", "ADMIN", "ACCOUNTANT", "FINANCE", "HR", "OPERATION", "STAFF", "VIEWER"]),
   status: z.enum(["ACTIVE", "INVITED", "SUSPENDED", "DELETED"]).default("INVITED"),
-  departmentId: optionalString,
+  departmentId: optionalObjectId,
   phone: optionalString,
 });
 
@@ -153,11 +176,11 @@ export const templateSchema = z.object({
 });
 
 export const documentSchema = z.object({
-  templateId: optionalString,
+  templateId: optionalObjectId,
   categoryId: objectIdLike,
   documentTypeId: objectIdLike,
-  customerId: optionalString,
-  employeeId: optionalString,
+  customerId: optionalObjectId,
+  employeeId: optionalObjectId,
   documentNo: nonEmptyString,
   title: nonEmptyString,
   status: z.enum(["DRAFT", "PENDING", "APPROVED", "REJECTED", "CANCELLED", "ARCHIVED"]).default("DRAFT"),
@@ -174,7 +197,7 @@ export const businessPartnerSchema = z.object({
   name: nonEmptyString,
   taxId: optionalString,
   branchCode: optionalString,
-  email: z.email("อีเมลไม่ถูกต้อง").optional(),
+  email: optionalEmail,
   phone: optionalString,
   address: optionalString,
   contactName: optionalString,
@@ -184,11 +207,13 @@ export const businessPartnerSchema = z.object({
 export const employeeSchema = z.object({
   code: optionalString,
   name: nonEmptyString,
-  email: z.email("อีเมลไม่ถูกต้อง").optional(),
+  email: optionalEmail,
   phone: optionalString,
   position: optionalString,
-  departmentId: optionalString,
-  salarySatang: z.coerce.number().int().min(0).optional(),
+  departmentId: optionalObjectId,
+  salarySatang: z.coerce.number().int().min(0).optional().nullable(),
+  startDate: optionalString,
+  endDate: optionalString,
   status: z.enum(["ACTIVE", "INVITED", "SUSPENDED", "DELETED"]).default("ACTIVE"),
 });
 

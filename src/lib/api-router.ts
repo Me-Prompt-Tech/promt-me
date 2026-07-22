@@ -2,7 +2,6 @@ import { auth } from "@/auth";
 import { createPdfExport } from "@/lib/pdf-export";
 import type { PdfExportInput } from "@/lib/pdf-export";
 import { prisma } from "@/lib/prisma";
-import type { PdfExportInput } from "@/lib/pdf-export";
 import {
   ApiError,
   apiErrorPayload,
@@ -72,7 +71,7 @@ function handleApiError(errorValue: unknown) {
       ok: false,
       code: "VALIDATION_ERROR",
       message: "มีข้อมูลนี้อยู่ในระบบแล้ว (ข้อมูลซ้ำซ้อน)",
-      error: (errorValue as Error).message,
+      error: (errorValue as any).message || "ข้อมูลซ้ำซ้อน",
     }, 400);
   }
 
@@ -198,38 +197,56 @@ const modelMap: Record<string, any> = {
   "template-fields": "templateField"
 };
 
-function getPrismaModel(resource: string) {
+function getPrismaModel(resource: string): any {
   const modelName = modelMap[resource];
   if (!modelName) throw new ApiError("ROUTE_NOT_FOUND", `No model for resource ${resource}`, 404);
-  // @ts-ignore
-  return prisma[modelName];
+  return (prisma as any)[modelName];
 }
 
 export async function dbList(resource: string, whereClause: any = {}) {
   const model = getPrismaModel(resource);
-  // Use createdAt desc if possible, otherwise it just returns data
-  const data = await model.findMany({ where: whereClause, orderBy: { createdAt: "desc" } });
+  const include = resource === "employees"
+    ? { department: true }
+    : resource === "departments"
+      ? { _count: { select: { users: true, employees: true } } }
+      : undefined;
+  const data = await model.findMany({ where: whereClause, include, orderBy: { createdAt: "desc" } });
   return { ok: true, resource, data };
 }
 
 export async function dbDetail(resource: string, whereClause: any = {}) {
   const model = getPrismaModel(resource);
-  const data = await model.findFirst({ where: whereClause });
+  const include = resource === "employees"
+    ? { department: true }
+    : resource === "departments"
+      ? { _count: { select: { users: true, employees: true } } }
+      : undefined;
+  const data = await model.findFirst({ where: whereClause, include });
   if (!data) throw new ApiError("NOT_FOUND", "ไม่พบข้อมูล", 404);
   return { ok: true, resource, data };
 }
 
 export async function dbCreate(resource: string, dataPayload: any) {
   const model = getPrismaModel(resource);
-  const data = await model.create({ data: dataPayload });
+  const include = resource === "employees"
+    ? { department: true }
+    : resource === "departments"
+      ? { _count: { select: { users: true, employees: true } } }
+      : undefined;
+  const data = await model.create({ data: dataPayload, include });
   return { ok: true, action: "create", resource, data };
 }
 
 export async function dbUpdate(resource: string, whereClause: any, dataPayload: any) {
   const model = getPrismaModel(resource);
+  const include = resource === "employees"
+    ? { department: true }
+    : resource === "departments"
+      ? { _count: { select: { users: true, employees: true } } }
+      : undefined;
   const existing = await model.findFirst({ where: whereClause });
   if (!existing) throw new ApiError("NOT_FOUND", "ไม่พบข้อมูล", 404);
-  const data = await model.update({ where: { id: existing.id }, data: dataPayload });
+  const data = await model.update({ where: { id: existing.id }, data: dataPayload, include });
   return { ok: true, action: "update", resource, data };
 }
 
@@ -265,7 +282,8 @@ export async function handleAdminApi(request: NextRequest, context: RouteContext
       return error("Forbidden: system admin only", 403, "FORBIDDEN");
     }
 
-    const path = (await context.params).path ?? [];
+    const rawPath = (await context.params).path ?? [];
+    const path = rawPath[0] === "admin" ? rawPath.slice(1) : rawPath;
     const [resource, id, action] = path;
 
     if (!resource || !adminCollections.has(resource)) {
@@ -323,26 +341,30 @@ export async function handleAdminApi(request: NextRequest, context: RouteContext
 
 export async function handleCompanyApi(request: NextRequest, context: RouteContext) {
   try {
-  const session = (await auth()) as ApiSession;
+    const session = (await auth()) as ApiSession;
 
-  if (!session) {
-    return error("Unauthorized", 401, "UNAUTHORIZED");
-  }
+    if (!session) {
+      return error("Unauthorized", 401, "UNAUTHORIZED");
+    }
 
-  const companyId = requireCompany(session);
+    const rawPath = (await context.params).path ?? [];
+    const isCompanyPrefix = rawPath[0] === "company";
+    const pathCompanyId = isCompanyPrefix ? rawPath[1] : undefined;
+    const path = isCompanyPrefix ? rawPath.slice(2) : rawPath;
 
-  if (!companyId) {
-    return error("Forbidden: company user with companyId required", 403, "FORBIDDEN");
-  }
+    const companyId = session?.user?.companyId || pathCompanyId;
 
-  assertCompanyActive(companyId);
+    if (!companyId) {
+      return error("Forbidden: company user with companyId required", 403, "FORBIDDEN");
+    }
 
-  const path = (await context.params).path ?? [];
-  const [resource, id, action, nestedId] = path;
+    assertCompanyActive(companyId);
 
-  if (!resource || !companyCollections.has(resource)) {
-    return error("Company API route not found", 404, "ROUTE_NOT_FOUND");
-  }
+    const [resource, id, action, nestedId] = path;
+
+    if (!resource || !companyCollections.has(resource)) {
+      return error("Company API route not found", 404, "ROUTE_NOT_FOUND");
+    }
 
   if (!isCompanyRoleAllowed(session.user.role, resource, request, action)) {
     return error("Forbidden: role is not allowed for this company action", 403, "FORBIDDEN");
